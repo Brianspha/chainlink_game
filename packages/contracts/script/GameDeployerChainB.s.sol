@@ -95,6 +95,91 @@ contract GameDeployerScript is Script, GameUtils, JsonDeploymentHandler {
         // Set up Controller
         controller = new Controller();
 
+        // Set up Game
+        game = new Game(
+            address(networkDetails.routerAddress),
+            address(networkDetails.linkAddress)
+        );
+
+        // Set up GameAttestation
+        gameAttestation = new GameAttestation();
+
+        // Set up Sign Protocol
+        signProtocol = new SP();
+
+        // Set up Token and NFT
+        token = new Token("PlayToken", "PT");
+        nft = new NFT("PlayNFT", "PNFT");
+
+        // Set up Sablier
+        SablierV2Comptroller sablierV2Comptroller = new SablierV2Comptroller(
+            owner
+        );
+        sablierV2NFTDescriptor = new SablierV2NFTDescriptor();
+        {
+            lockupLinear = new SablierV2LockupLinear(
+                owner,
+                sablierV2Comptroller,
+                sablierV2NFTDescriptor
+            );
+            streamCreator = new StreamCreator(lockupLinear, address(token));
+
+            // Initialize game
+            game.initialise(
+                token,
+                gameAttestation,
+                nft,
+                streamCreator,
+                address(vrfConsumer),
+                networkDetails.chainSelector
+            );
+
+            // Set controllers
+            vrfConsumer.setController(address(controller));
+            game.setController(address(controller));
+            token.setController(address(controller));
+            nft.setController(address(controller));
+            streamCreator.setController(address(controller));
+            gameAttestation.setController(address(controller));
+
+            // Grant roles
+            controller.grantRole(controller.OWNER_ROLE(), address(game));
+            controller.grantRole(controller.OWNER_ROLE(), address(nft));
+            controller.grantRole(controller.OWNER_ROLE(), address(token));
+            controller.grantRole(
+                controller.OWNER_ROLE(),
+                address(streamCreator)
+            );
+
+            // Set up GameAttestation
+            gameAttestation.setSPInstance(address(signProtocol));
+            gameAttestation.registerSchema(
+                Schema({
+                    hook: ISPHook(address(0)), // No hook for now
+                    revocable: true,
+                    registrant: address(gameAttestation),
+                    maxValidFor: 7 days,
+                    timestamp: uint64(block.timestamp),
+                    data: "{"
+                    '"name":"No name Game Play Token",'
+                    '"description":"Schema for Play token",'
+                    '"data":[]'
+                    "}",
+                    dataLocation: DataLocation.ONCHAIN
+                })
+            );
+
+            game.setPrizePool(prizePool);
+            game.setPlayCost(COST_TO_PLAY);
+
+            // Mint tokens
+            _faucetMint(address(token), owner, 11000000000000 ether);
+            _faucetMint(address(token), address(game), 10000000000000000 ether);
+
+            // Approve tokens for game
+            token.approve(address(game), type(uint256).max);
+            chainNetworkDetails = networkDetails;
+            SUBSCRIPTION_ID = subscriptionID;
         }
     }
     function _createPrizePool() internal {
