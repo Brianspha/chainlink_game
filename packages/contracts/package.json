@@ -1,0 +1,44 @@
+{
+    "name": "contracts",
+    "version": "1.0.0",
+    "main": "index.js",
+    "license": "MIT",
+    "devDependencies": {
+        "@nomicfoundation/hardhat-ethers": "^3.0.5",
+        "@openzeppelin/hardhat-upgrades": "^3.0.5",
+        "ds-test": "https://github.com/dapphub/ds-test",
+        "ethers": "^6.11.1",
+        "forge-std": "github:foundry-rs/forge-std#v1.7.6",
+        "ts-node": "^10.9.2",
+        "typescript": "^5.4.2"
+    },
+    "dependencies": {
+        "@chainlink/contracts": "^0.8.0",
+        "@chainlink/env-enc": "^1.0.5",
+        "@chainlink/local": "github:smartcontractkit/chainlink-local",
+        "@ethsign/sign-protocol-evm": "^1.1.1",
+        "@nomicfoundation/hardhat-foundry": "^1.1.1",
+        "@nomicfoundation/hardhat-toolbox": "^4.0.0",
+        "@openzeppelin/contracts": "5.0.2",
+        "@openzeppelin/contracts-upgradeable": "^5.0.2",
+        "@sablier/v2-core": "^1.1.2",
+        "cross-not-official": "^1.0.0",
+        "dotenv": "^16.4.5",
+        "hardhat": "^2.20.1",
+        "hardhat-contract-sizer": "^2.10.0",
+        "hardhat-deploy": "^0.11.45",
+        "hardhat-deploy-ethers": "^0.4.1",
+        "hardhat-gas-reporter": "^1.0.10",
+        "solidity-coverage": "^0.8.6",
+        "solidity-docgen": "^0.6.0-beta.36",
+        "ts-node": "^10.9.2",
+        "typechain": "^8.3.2",
+        "web3-eth-contract": "^4.2.0"
+    },
+    "scripts": {
+        "deploy:local": "forge clean; forge script ./script/IPHolderRegistrar.s.sol:IPHolderPScript --rpc-url http://localhost:8546 --broadcast   -vvv",
+        "deploy:sepolia": "forge clean; forge script ./script/IPHolderRegistrar.s.sol:IPHolderPScript --rpc-url https://rpc2.sepolia.org --verify --etherscan-api-key YMBB89U1I29XNFUMNEZB2PUYVBBYUDT76W --broadcast --gas-price 29355923322 --slow  -vvv",
+        "test": "forge test --gas-report --force -vvvvvv",
+        "deps": "npm i --legacy-peer-deps"
+    }
+}

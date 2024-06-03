@@ -1,0 +1,13 @@
+@chainlink/contracts@0.8.0/src=node_modules/@chainlink/contracts/src
+@eth-optimism/=node_modules/@chainlink/contracts/node_modules/@eth-optimism/
+@openzeppelin/=node_modules/@openzeppelin/
+@prb/=node_modules/@prb/
+@sablier/=node_modules/@sablier/
+@story-protocol/=node_modules/@story-protocol/
+erc6551/=node_modules/erc6551/
+eth-gas-reporter/=node_modules/eth-gas-reporter/
+forge-std/=node_modules/forge-std/src
+hardhat/=node_modules/hardhat/
+ds-test/=node_modules/ds-test/src
+@chainlink/local/=node_modules/@chainlink/local
+@chainlink/contracts-ccip/=node_modules/@chainlink/contracts-ccip/
