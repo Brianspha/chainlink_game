@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.23;
+
 import {IGame} from "./IGame.sol";
 import {Controller} from "../utils/Controller.sol";
 import {IResourceController} from "../utils/IResourceController.sol";
@@ -20,6 +21,9 @@ import {ReentrancyGuardUpgradeable} from "@openzeppelin/contracts-upgradeable/ut
 import "@openzeppelin/contracts/utils/cryptography/ECDSA.sol";
 import "@openzeppelin/contracts/utils/cryptography/MessageHashUtils.sol";
 
+/// @title Game Contract
+/// @notice This contract manages game logic, including token management, cross-chain functionality, and prize distribution.
+/// @dev This contract utilizes UUPS upgradeability, Ownable, CCIPReceiver, and ReentrancyGuard features.
 contract Game is
     IGame,
     IResourceController,
@@ -29,6 +33,7 @@ contract Game is
     ReentrancyGuardUpgradeable
 {
     using ECDSA for bytes32;
+    // Modifiers
     modifier notAlreadyClaimed() virtual {
         if (freePlays[msg.sender]) {
             revert FreePlayAlreadyClaimed();
@@ -55,6 +60,7 @@ contract Game is
 
         _;
     }
+    // State variables
     VRFConsumer public vrfConsumer;
     Token public playToken;
     NFT public nft;
@@ -67,9 +73,9 @@ contract Game is
     uint64 public chainSelector;
     PoolPrize[] public gamePrizes;
     uint256[] public crosschainScores;
-    mapping(address player => bool claimed) freePlays;
-    mapping(address user => Player player) public playTokens;
-    mapping(address user => bool blackListed) public blackList;
+    mapping(address => bool) public freePlays;
+    mapping(address => Player) public playTokens;
+    mapping(address => bool) public blackList;
 
     /// @custom:oz-upgrades-unsafe-allow constructor
     constructor(address router_, address link_) CCIPReceiver(router_) {
@@ -77,6 +83,13 @@ contract Game is
         link = link_;
     }
 
+    /// @notice Initializes the game contract with necessary dependencies
+    /// @param acceptedPlayToken The token accepted for play
+    /// @param attestor The attestor for game play tokens
+    /// @param nft_ The NFT contract
+    /// @param streamCreator_ The stream creator contract
+    /// @param vconsumer The VRF consumer contract
+    /// @param chainSelector_ The chain selector for cross-chain operations
     function initialise(
         Token acceptedPlayToken,
         GameAttestation attestor,
@@ -96,14 +109,17 @@ contract Game is
         chainSelector = chainSelector_;
         playToken.approve(address(streamCreator), type(uint256).max);
     }
-    event TestSablier(uint256 indexed sablierAmount);
+
+    /// @notice Submits a user's score
+    /// @param userScores The scores to be submitted
+    /// @param signature The signature to verify the submission
+    /// @param winnings The winnings to be distributed
+    /// @inheritdoc IGame
     function submitScore(
         uint256[] memory userScores,
         bytes calldata signature,
-        uint256[] memory sablierWins,
-        uint256[] memory nftWins,
-        uint256[] memory tokenWins
-    ) public override canPlayGame canPlayGame notBlackListed nonReentrant {
+        uint256[] memory winnings
+    ) public override canPlayGame notBlackListed nonReentrant {
         bytes32 messageHash = keccak256(
             abi.encodePacked(userScores, owner(), block.chainid)
         );
@@ -115,58 +131,58 @@ contract Game is
         if (userScores.length > 10) {
             revert TopTenOnly();
         }
-        if (
-            (sablierWins.length + nftWins.length + tokenWins.length) > 12 ||
-            sablierWins.length > 12 ||
-            nftWins.length > 12 ||
-            tokenWins.length > 12
-        ) {
+        if (winnings.length > 12) {
             revert MaxTwelveWinnings();
         }
         crosschainScores = new uint256[](userScores.length);
-        uint256 i;
-        for (; i < userScores.length; i++) {
+        for (uint256 i = 0; i < userScores.length; i++) {
             crosschainScores[i] = userScores[i];
         }
-        i = 0;
-        for (; i < nftWins.length; i++) {
-            if (gamePrizes[nftWins[i]].prizeType == Prize.NFT) {
-                nft.mint(msg.sender);
-            }
-        }
+
         uint256 totalTokens;
-        i = 0;
-        for (; i < sablierWins.length; i++) {
-            if (gamePrizes[sablierWins[i]].prizeType == Prize.Sablier) {
-                totalTokens += gamePrizes[sablierWins[i]].amount;
-                emit TestSablier(gamePrizes[sablierWins[i]].amount);
+        uint256 totalSablier;
+        for (uint256 i = 0; i < winnings.length; i++) {
+            if (winnings[i] >= gamePrizes.length) continue;
+            if (gamePrizes[winnings[i]].prizeType == Prize.NFT) {
+                nft.mint(msg.sender);
+            } else if (gamePrizes[winnings[i]].prizeType == Prize.Sablier) {
+                totalSablier += gamePrizes[winnings[i]].amount;
+            } else if (gamePrizes[winnings[i]].prizeType == Prize.Token) {
+                totalTokens += gamePrizes[winnings[i]].amount;
             }
         }
-        if (totalTokens > 0) {
+
+        if (totalSablier > 0) {
             streamCreator.createLockupLinearStream(
                 msg.sender,
-                totalTokens,
+                totalSablier,
                 uint40(block.timestamp + 30 days),
                 uint40(block.timestamp + 2 minutes),
                 uint40(block.timestamp + 1 minutes)
             );
         }
 
-        totalTokens = 0;
-        i = 0;
-        for (; i < tokenWins.length; i++) {
-            if (gamePrizes[tokenWins[i]].prizeType == Prize.Sablier) {
-                totalTokens += gamePrizes[tokenWins[i]].amount;
-            }
-        }
         if (totalTokens > 0) {
             playToken.transfer(msg.sender, totalTokens);
         }
     }
+
+    /// @notice Fetches the winnings based on the total collected and the provided signature
+    /// @param totalCollected The total number of collected items
+    /// @param signature The signature to verify the request
     /// @inheritdoc IGame
     function getWinnings(
-        uint16 totalCollected
+        uint16 totalCollected,
+        bytes calldata signature
     ) public override returns (uint256[] memory items) {
+        bytes32 messageHash = keccak256(
+            abi.encodePacked(msg.sender, block.chainid)
+        );
+        bytes32 message = MessageHashUtils.toEthSignedMessageHash(messageHash);
+        address recoveredAddress = ECDSA.recover(message, signature);
+        if (recoveredAddress != owner()) {
+            revert InvalidClientSignature();
+        }
         uint256 requestId = vrfConsumer.requestRandomNumbers();
         uint256[] memory wins = new uint256[](totalCollected);
         for (uint256 i = 0; i < totalCollected; i++) {
@@ -179,11 +195,11 @@ contract Game is
         items = wins;
     }
 
+    /// @notice Allows a player to play the game
     /// @inheritdoc IGame
     function play()
         public
         override
-        canPlayGame
         canPlayGame
         notBlackListed
         returns (bool ok)
@@ -210,12 +226,14 @@ contract Game is
         }
 
         if (pay && success) {
-            uint64 tokenId = _createPlayToken(3600);
+            uint64 tokenId = _createPlayToken(3600, msg.sender);
             player.player = msg.sender;
             player.token = tokenId;
         }
         emit PaidPlay(msg.sender, playCost);
     }
+
+    /// @notice Allows a player to claim a free play
     /// @inheritdoc IGame
     function freePlay()
         public
@@ -225,12 +243,17 @@ contract Game is
         notBlackListed
     {
         Player storage player = playTokens[msg.sender];
-        uint64 tokenId = _createPlayToken(1800);
+        uint64 tokenId = _createPlayToken(1800, msg.sender);
         player.player = msg.sender;
         player.token = tokenId;
         freePlays[msg.sender] = true;
         emit FreePlay(msg.sender, playCost);
     }
+
+    /// @notice Allows a player to initiate cross-chain play
+    /// @param message The game message containing play details
+    /// @param destinationChainSelector The chain selector for the destination chain
+    /// @inheritdoc IGame
     function crossChainPlay(
         GameMessage memory message,
         uint64 destinationChainSelector
@@ -241,11 +264,10 @@ contract Game is
         }
 
         Client.EVM2AnyMessage memory message_ = Client.EVM2AnyMessage({
-            receiver: abi.encode(message.reciever),
+            receiver: abi.encode(message.receiver),
             data: abi.encode(message),
             tokenAmounts: new Client.EVMTokenAmount[](0),
             extraArgs: Client._argsToBytes(
-                // Additional arguments, setting gas limit
                 Client.EVMExtraArgsV1({gasLimit: 500_000})
             ),
             feeToken: link
@@ -256,7 +278,7 @@ contract Game is
             message_
         );
 
-        IERC20(link).approve(address(router), fee + 1 ether);
+        IERC20(link).approve(address(router), fee);
 
         messageId = IRouterClient(router).ccipSend(
             destinationChainSelector,
@@ -265,18 +287,25 @@ contract Game is
         emit MessageSent(
             messageId,
             destinationChainSelector,
-            message.reciever,
+            message.receiver,
             message,
             fee
         );
     }
 
+    /// @notice Gets the player details
+    /// @param player_ The address of the player
+    /// @return player The player details
+    /// @inheritdoc IGame
     function getPlayer(
         address player_
     ) external view override returns (Player memory player) {
         return playTokens[player_];
     }
 
+    /// @notice Returns the prize pool for the game
+    /// @return pool The prize pool
+    /// @inheritdoc IGame
     function getPrizePool()
         public
         view
@@ -285,9 +314,15 @@ contract Game is
     {
         return gamePrizes;
     }
+
+    /// @notice Returns the cross-chain scores
+    /// @return The cross-chain scores
     function scores() external view returns (uint256[] memory) {
         return crosschainScores;
     }
+
+    /// @notice Sets the prize pool for the game
+    /// @param prizes The prizes to be set
     /// @inheritdoc IGame
     function setPrizePool(
         PoolPrize[] memory prizes
@@ -296,28 +331,39 @@ contract Game is
             revert MaxTwelvePrizePool();
         }
 
-        uint256 i;
         uint256 length = prizes.length;
-        for (; i < length; i++) {
+        for (uint256 i = 0; i < length; i++) {
             gamePrizes.push(prizes[i]);
         }
         emit GamePrizeSet(prizes);
     }
+
+    /// @notice Blacklists a player
+    /// @param player The address of the player to be blacklisted
     /// @inheritdoc IGame
     function blackListPlayer(address player) public override onlyOwner {
         blackList[player] = true;
         emit BlackListed(player);
     }
+
+    /// @notice Whitelists a player
+    /// @param player The address of the player to be whitelisted
     /// @inheritdoc IGame
     function whiteListPlayer(address player) public override onlyOwner {
         blackList[player] = false;
         emit WhiteListed(player);
     }
+
+    /// @notice Sets the controller contract address
+    /// @param controllerAdd The address of the new controller
     /// @inheritdoc IResourceController
     function setController(address controllerAdd) public override onlyOwner {
         emit ControllerUpdated(address(controller), controllerAdd);
         controller = Controller(controllerAdd);
     }
+
+    /// @notice Sets the play cost for the game
+    /// @param cost The new play cost
     /// @inheritdoc IGame
     function setPlayCost(uint256 cost) public onlyOwner {
         if (cost == 0) {
@@ -326,13 +372,19 @@ contract Game is
         emit PlayCostUpdate(playCost, cost);
         playCost = cost;
     }
+
+    /// @notice Creates a play token for a player
+    /// @param validUntil The validity period of the play token
+    /// @param player The address of the player
+    /// @return tokenId The ID of the created play token
     function _createPlayToken(
-        uint64 validUntil
+        uint64 validUntil,
+        address player
     ) internal returns (uint64 tokenId) {
         bytes[] memory recipients;
         tokenId = playTokenAttestor.attestGamePlay(
-            IGameAttestation.GamePlayAttestion({
-                user: msg.sender,
+            IGameAttestation.GamePlayAttestation({
+                user: player,
                 game: address(this),
                 cost: playCost,
                 recipients: recipients,
@@ -340,6 +392,8 @@ contract Game is
             })
         );
     }
+
+    /// @inheritdoc CCIPReceiver
     function _ccipReceive(
         Client.Any2EVMMessage memory any2EvmMessage
     ) internal override {
@@ -347,7 +401,7 @@ contract Game is
             any2EvmMessage.data,
             (GameMessage)
         );
-        if (message.reciever != address(this)) {
+        if (message.receiver != address(this)) {
             revert NotAllowed();
         }
         Player storage player = playTokens[message.player];
@@ -360,7 +414,8 @@ contract Game is
             }
             message.validToken = true;
             message.validUntil = attestation.validUntil;
-            message.reciever = abi.decode(any2EvmMessage.sender, (address));
+            message.messageType = MessageType.Verified;
+            message.receiver = abi.decode(any2EvmMessage.sender, (address));
             emit MessageReceived(
                 any2EvmMessage.messageId,
                 any2EvmMessage.sourceChainSelector,
@@ -374,8 +429,9 @@ contract Game is
         if (message.messageType != MessageType.Verified || message.validToken) {
             revert CrossPlayNotAllowed();
         }
-
-        uint64 tokenId = _createPlayToken(message.validUntil);
+        player = playTokens[message.playerChainB];
+        player.player = message.playerChainB;
+        uint64 tokenId = _createPlayToken(message.validUntil, player.player);
         player.token = tokenId;
 
         emit MessageReceived(
@@ -385,6 +441,10 @@ contract Game is
             message
         );
     }
+
+    /// @notice Authorizes the upgrade of the contract
+    /// @param newImplementation The address of the new implementation
+    /// @inheritdoc UUPSUpgradeable
     function _authorizeUpgrade(
         address newImplementation
     ) internal override onlyOwner {}

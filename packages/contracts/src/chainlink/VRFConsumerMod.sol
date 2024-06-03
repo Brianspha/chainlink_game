@@ -1,11 +1,13 @@
 // SPDX-License-Identifier: MIT
 // An example of a consumer contract that relies on a subscription for funding.
 pragma solidity >=0.8.7;
+import {Ownable} from "@openzeppelin/contracts/access/Ownable.sol";
 
 import {VRFConsumerBaseV2} from "@chainlink/contracts@0.8.0/src/v0.8/vrf/VRFConsumerBaseV2.sol";
 import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 import {VRFCoordinatorV2Interface} from "@chainlink/contracts@0.8.0/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
-
+import {Controller} from "../utils/Controller.sol";
+import {IResourceController} from "../utils/IResourceController.sol";
 /**
  * Request testnet LINK and ETH here: https://faucets.chain.link/
  * Find information on LINK Token Contracts and get the latest ETH and LINK faucets here: https://docs.chain.link/docs/link-token-contracts/
@@ -17,10 +19,9 @@ import {VRFCoordinatorV2Interface} from "@chainlink/contracts@0.8.0/src/v0.8/int
  * DO NOT USE THIS CODE IN PRODUCTION.
  */
 
-contract VRFConsumerMod is VRFConsumerBaseV2, AccessControl {
+contract VRFConsumerMod is VRFConsumerBaseV2, IResourceController,Ownable {
     event RequestSent(uint256 requestId, uint32 numWords);
     event RequestFulfilled(uint256 requestId, uint256[] randomWords);
-    bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
     error RequestNotFound();
     struct RequestStatus {
         bool fulfilled; // whether the request has been successfully fulfilled
@@ -30,7 +31,7 @@ contract VRFConsumerMod is VRFConsumerBaseV2, AccessControl {
     mapping(uint256 => RequestStatus)
         public randomNumbersRequests; /* requestId --> requestStatus */
     VRFCoordinatorV2InterfaceMod COORDINATOR;
-
+    Controller public controller;
     // Your subscription ID.
     uint64 s_subscriptionId;
 
@@ -67,22 +68,18 @@ contract VRFConsumerMod is VRFConsumerBaseV2, AccessControl {
         uint64 subscriptionId,
         uint256 maxNum,
         address vrfCoordinator
-    ) VRFConsumerBaseV2(vrfCoordinator) {
+    ) VRFConsumerBaseV2(vrfCoordinator) Ownable(msg.sender) {
         COORDINATOR = VRFCoordinatorV2InterfaceMod(vrfCoordinator);
         s_subscriptionId = subscriptionId;
         maxNumber = maxNum;
-        _setRoleAdmin(OWNER_ROLE, OWNER_ROLE);
-        _grantRole(OWNER_ROLE, msg.sender);
     }
-    function addAdmin(address _admin) external onlyRole(OWNER_ROLE) {
-        grantRole(OWNER_ROLE, _admin);
-    }
+
     // Assumes the subscription is funded sufficiently.
-    function requestRandomNumbers()
-        external
-        onlyRole(OWNER_ROLE)
-        returns (uint256 requestId)
-    {
+    function requestRandomNumbers() external returns (uint256 requestId) {
+        require(
+            controller.hasRole(controller.OWNER_ROLE(), msg.sender) ||
+                msg.sender == owner()
+        );
         // Will revert if subscription is not set and funded.
         requestId = COORDINATOR.requestRandomWords(
             keyHash,
@@ -99,7 +96,7 @@ contract VRFConsumerMod is VRFConsumerBaseV2, AccessControl {
         requestIds.push(requestId);
         lastRequestId = requestId;
         emit RequestSent(requestId, numWords);
-        COORDINATOR.fulfillRandomWords(requestId,address(this));
+        COORDINATOR.fulfillRandomWords(requestId, address(this));
         return requestId;
     }
 
@@ -124,8 +121,12 @@ contract VRFConsumerMod is VRFConsumerBaseV2, AccessControl {
         RequestStatus memory request = randomNumbersRequests[_requestId];
         return (request.fulfilled, request.randomWord);
     }
+    /// @inheritdoc IResourceController
+    function setController(address controllerAdd) public override onlyOwner {
+        emit ControllerUpdated(address(controller), controllerAdd);
+        controller = Controller(controllerAdd);
+    }
 }
-
 
 interface VRFCoordinatorV2InterfaceMod is VRFCoordinatorV2Interface {
     function fulfillRandomWords(uint256 requestId, address consumer) external;

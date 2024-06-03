@@ -36,7 +36,8 @@
         "web3-eth-contract": "^4.2.0"
     },
     "scripts": {
-        "deploy:local": "forge clean; forge script ./script/IPHolderRegistrar.s.sol:IPHolderPScript --rpc-url http://localhost:8546 --broadcast   -vvv",
+        "deploy:local::A": "forge clean; forge script ./script/GameDeployerChainA.s.sol:GameDeployerScript --rpc-url http://localhost:8545 --broadcast -vvvvv --via-ir --legacy --slow",
+        "deploy:local::B": "forge clean; forge script ./script/GameDeployerChainB.s.sol:GameDeployerScript --rpc-url http://localhost:8546 --broadcast -vvvvv --via-ir --legacy --slow",
         "deploy:sepolia": "forge clean; forge script ./script/IPHolderRegistrar.s.sol:IPHolderPScript --rpc-url https://rpc2.sepolia.org --verify --etherscan-api-key YMBB89U1I29XNFUMNEZB2PUYVBBYUDT76W --broadcast --gas-price 29355923322 --slow  -vvv",
         "test": "forge test --gas-report --force -vvvvvv",
         "deps": "npm i --legacy-peer-deps"

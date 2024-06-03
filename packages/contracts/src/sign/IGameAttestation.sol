@@ -1,17 +1,24 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.23;
+
 import {ISP} from "@ethsign/sign-protocol-evm/src/interfaces/ISP.sol";
 import {Schema} from "@ethsign/sign-protocol-evm/src/models/Schema.sol";
 import {Attestation} from "@ethsign/sign-protocol-evm/src/models/Attestation.sol";
 import {DataLocation} from "@ethsign/sign-protocol-evm/src/models/DataLocation.sol";
-import "@ethsign/sign-protocol-evm/src/interfaces/ISP.sol";
+
+/// @title Game Attestation Interface
+/// @notice Provides functions to manage game play attestations using the Sign Protocol
 interface IGameAttestation {
-    // errors
+    // Custom error to indicate that the Sign Protocol instance has not been initialized
     error SPNotInitialized();
 
-    //structs
-
-    struct GamePlayAttestion {
+    /// @notice Struct to represent a game play attestation
+    /// @param user The address of the user
+    /// @param game The address of the game
+    /// @param cost The cost of the game play
+    /// @param recipients The addresses of the recipients
+    /// @param validUntil The timestamp until which the attestation is valid
+    struct GamePlayAttestation {
         address user;
         address game;
         uint256 cost;
@@ -19,6 +26,10 @@ interface IGameAttestation {
         uint64 validUntil;
     }
 
+    /// @notice Event emitted when a game play starts usually after an attestation is completed
+    /// @param attestationId The ID of the attestation
+    /// @param user The address of the user
+    /// @param game The address of the game
     event GamePlayStarted(
         uint64 indexed attestationId,
         address indexed user,
@@ -33,7 +44,11 @@ interface IGameAttestation {
     /// @param schema The schema used for creating attestations
     function registerSchema(Schema memory schema) external;
 
+    /// @notice Attests to a game play
+    /// @dev This function is used to issue playtokens for any user
+    /// @param attestation The attestation details for the game play
+    /// @return attestationId The ID of the created attestation
     function attestGamePlay(
-        GamePlayAttestion memory attestation
+        GamePlayAttestation memory attestation
     ) external returns (uint64);
 }

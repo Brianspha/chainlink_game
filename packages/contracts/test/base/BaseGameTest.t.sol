@@ -75,224 +75,226 @@ abstract contract BaseGameTest is Test, GameUtils {
     Register.NetworkDetails public chainANetworkDetails;
     Register.NetworkDetails chainBNetworkDetails;
     function setUp() public virtual {
+        // Initialize RPC URLs
         CHAINA_RPC = vm.envString("ETHEREUM_SEPOLIA_RPC_URL");
         CHAINB_RPC = vm.envString("ARBITRUM_SEPOLIA_RPC_URL");
+
+        // Create and select forks for both chains
         chainAForkID = vm.createSelectFork(CHAINA_RPC, 6028236);
         chainBForkID = vm.createFork(CHAINB_RPC, 50643503);
+
+        // Initialize CCIP local simulator fork
         ccipLocalSimulatorFork = new CCIPLocalSimulatorFork();
         vm.makePersistent(address(ccipLocalSimulatorFork));
-        vm.selectFork(chainAForkID);
-        (sphaA, sphaPKA) = _createUser("sphaCHAINA");
-        (mikeA, mikePKA) = _createUser("mikeCHAINA");
-        (ownerA, ownerPKA) = _createUser("ownerCHAINA");
-        chainANetworkDetails = ccipLocalSimulatorFork.getNetworkDetails(
-            block.chainid
+        // Create prize pool
+        _createPrizePool();
+        // Set up Chain A
+        setupChain(chainAForkID, "A");
+        // Set up Chain B
+        setupChain(chainBForkID, "B");
+
+        // Fund games with LINK from the faucet
+        fundGameWithLink(chainAForkID, address(gameA), ownerA);
+        fundGameWithLink(chainBForkID, address(gameB), ownerB);
+    }
+
+    function setupChain(
+        uint256 chainForkID,
+        string memory chainLabel
+    ) internal {
+        vm.selectFork(chainForkID);
+        (
+            address spha,
+            address mike,
+            address owner,
+            uint256 sphaPK,
+            uint256 mikePK,
+            uint256 ownerPK
+        ) = createUsers(chainLabel);
+
+         Register.NetworkDetails memory networkDetails = ccipLocalSimulatorFork
+            .getNetworkDetails(block.chainid);
+        vm.startPrank(owner);
+
+        // Set up VRF
+        VRFCoordinatorV2Mock vrfMockCoordinator = new VRFCoordinatorV2Mock(
+            BASEFEE,
+            GASPRICELINK
         );
-        vm.startPrank(ownerA);
-        vrfMockCoordinatorA = new VRFCoordinatorV2Mock(BASEFEE, GASPRICELINK);
-        SUBSCRIPTION_IDA = vrfMockCoordinatorA.createSubscription();
-        vrfConsumerA = new VRFConsumerMod(
-            SUBSCRIPTION_IDA,
-            10000,
-            address(vrfMockCoordinatorA)
+        uint64 subscriptionID = vrfMockCoordinator.createSubscription();
+        VRFConsumerMod vrfConsumer = new VRFConsumerMod(
+            subscriptionID,
+            prizePool.length + 5,
+            address(vrfMockCoordinator)
         );
-        vrfMockCoordinatorA.fundSubscription(
-            SUBSCRIPTION_IDA,
-            1000000000000000000
-        );
-        controllerA = new Controller();
-        gameA = new Game(
-            address(chainANetworkDetails.routerAddress),
-            address(chainANetworkDetails.linkAddress)
+        vrfMockCoordinator.fundSubscription(subscriptionID, 1 ether);
+        vrfMockCoordinator.addConsumer(subscriptionID, address(vrfConsumer));
+
+        // Set up Controller
+        Controller controller = new Controller();
+
+        // Set up Game
+        Game game = new Game(
+            address(networkDetails.routerAddress),
+            address(networkDetails.linkAddress)
         );
 
-        gameAttestationA = new GameAttestation();
-        signProtocolA = new SP();
-        tokenA = new Token("PlayToken", "PT");
-        nftA = new NFT("PlayNFT", "PNFT");
-        gameAttestationA.setController(address(controllerA));
-        SablierV2Comptroller sablierV2ComptrollerA = new SablierV2Comptroller(
-            ownerA
+        // Set up GameAttestation
+        GameAttestation gameAttestation = new GameAttestation();
+
+        // Set up Sign Protocol
+        SP signProtocol = new SP();
+
+        // Set up Token and NFT
+        Token token = new Token("PlayToken", "PT");
+        NFT nft = new NFT("PlayNFT", "PNFT");
+
+        // Set up Sablier
+        SablierV2Comptroller sablierV2Comptroller = new SablierV2Comptroller(
+            owner
         );
-        sablierV2NFTDescriptorA = new SablierV2NFTDescriptor();
-        lockupLinearA = new SablierV2LockupLinear(
-            ownerA,
-            sablierV2ComptrollerA,
-            sablierV2NFTDescriptorA
+        SablierV2NFTDescriptor sablierV2NFTDescriptor = new SablierV2NFTDescriptor();
+       {
+         SablierV2LockupLinear lockupLinear = new SablierV2LockupLinear(
+            owner,
+            sablierV2Comptroller,
+            sablierV2NFTDescriptor
         );
-        streamCreatorA = new StreamCreator(lockupLinearA, address(tokenA));
-        gameA.initialise(
-            tokenA,
-            gameAttestationA,
-            nftA,
-            streamCreatorA,
-            address(vrfConsumerA),
-            chainANetworkDetails.chainSelector
+        StreamCreator streamCreator = new StreamCreator(
+            lockupLinear,
+            address(token)
         );
-        gameA.setController(address(controllerA));
-        tokenA.setController(address(controllerA));
-        nftA.setController(address(controllerA));
-        streamCreatorA.setController(address(controllerA));
-        controllerA.grantRole(controllerA.OWNER_ROLE(), address(gameA));
-        controllerA.grantRole(controllerA.OWNER_ROLE(), address(nftA));
-        controllerA.grantRole(controllerA.OWNER_ROLE(), address(tokenA));
-        controllerA.grantRole(
-            controllerA.OWNER_ROLE(),
-            address(streamCreatorA)
+
+        // Initialize game
+        game.initialise(
+            token,
+            gameAttestation,
+            nft,
+            streamCreator,
+            address(vrfConsumer),
+            networkDetails.chainSelector
         );
-        gameAttestationA.setSPInstance(address(signProtocolA));
-        gameAttestationA.registerSchema(
+
+        // Set controllers
+        vrfConsumer.setController(address(controller));
+        game.setController(address(controller));
+        token.setController(address(controller));
+        nft.setController(address(controller));
+        streamCreator.setController(address(controller));
+        gameAttestation.setController(address(controller));
+
+        // Grant roles
+        controller.grantRole(controller.OWNER_ROLE(), address(game));
+        controller.grantRole(controller.OWNER_ROLE(), address(nft));
+        controller.grantRole(controller.OWNER_ROLE(), address(token));
+        controller.grantRole(controller.OWNER_ROLE(), address(streamCreator));
+
+        // Set up GameAttestation
+        gameAttestation.setSPInstance(address(signProtocol));
+        gameAttestation.registerSchema(
             Schema({
-                hook: ISPHook(address(0)), //@dev no hook for now
+                hook: ISPHook(address(0)), // No hook for now
                 revocable: true,
-                registrant: address(gameAttestationA),
+                registrant: address(gameAttestation),
                 maxValidFor: 7 days,
                 timestamp: uint64(block.timestamp),
                 data: "{"
-                "name"
-                ":"
-                "No name Game Play Token"
-                ","
-                "description"
-                ":"
-                "Schema for Play token"
-                ", "
-                "data"
-                ":"
-                "[]"
+                '"name":"No name Game Play Token",'
+                '"description":"Schema for Play token",'
+                '"data":[]'
                 "}",
                 dataLocation: DataLocation.ONCHAIN
             })
         );
-        prizePool.push(PoolPrize({prizeType: Prize.NFT, amount: 1}));
-        prizePool.push(PoolPrize({prizeType: Prize.Token, amount: 5 ether}));
-        prizePool.push(
-            PoolPrize({prizeType: Prize.Sablier, amount: 10 ether})
-        );
-        controllerA.grantRole(
-            controllerA.OWNER_ROLE(),
-            address(streamCreatorA)
-        );
-        gameA.setPrizePool(prizePool);
-        gameA.setPlayCost(COST_TO_PLAY);
-        _faucetMint(address(tokenA), ownerA, sphaA, 1000000000000 ether);
-        _faucetMint(address(tokenA), ownerA, mikeA, 1000000000000 ether);
-        _faucetMint(address(tokenA), ownerA, ownerA, 1000000000000 ether);
+
+
+        game.setPrizePool(prizePool);
+        game.setPlayCost(COST_TO_PLAY);
+
+        // Mint tokens
+        _faucetMint(address(token), owner, spha, 1000000000000 ether);
+        _faucetMint(address(token), owner, mike, 1000000000000 ether);
+        _faucetMint(address(token), owner, owner, 1000000000000 ether);
         _faucetMint(
-            address(tokenA),
-            ownerA,
-            address(gameA),
+            address(token),
+            owner,
+            address(game),
             10000000000000000 ether
-        );
-        tokenA.approve(address(gameA), type(uint256).max);
-        //Setup B
-        vm.selectFork(chainBForkID);
-        (sphaB, sphaPKB) = _createUser("sphaCHAINB");
-        (mikeB, mikePKB) = _createUser("mikeCHAINB");
-        (ownerB, ownerPKB) = _createUser("ownerCHAINB");
-        chainBNetworkDetails = ccipLocalSimulatorFork.getNetworkDetails(
-            block.chainid
-        );
-        vm.startPrank(ownerB);
-        vrfMockCoordinatorB = new VRFCoordinatorV2Mock(BASEFEE, GASPRICELINK);
-        SUBSCRIPTION_IDB = vrfMockCoordinatorB.createSubscription();
-        vrfConsumerA = new VRFConsumerMod(
-            SUBSCRIPTION_IDB,
-            10000,
-            address(vrfMockCoordinatorB)
-        );
-        vrfMockCoordinatorB.fundSubscription(
-            SUBSCRIPTION_IDB,
-            1000000000000000000
-        );
-        controllerB = new Controller();
-        gameB = new Game(
-            address(chainBNetworkDetails.routerAddress),
-            address(chainBNetworkDetails.linkAddress)
         );
 
-        gameAttestationB = new GameAttestation();
-        signProtocolB = new SP();
-        tokenB = new Token("PlayToken", "PT");
-        nftB = new NFT("PlayNFT", "PNFT");
-        gameAttestationB.setController(address(controllerB));
-        SablierV2Comptroller sablierV2ComptrollerB = new SablierV2Comptroller(
-            ownerB
-        );
-        sablierV2NFTDescriptorB = new SablierV2NFTDescriptor();
-        lockupLinearB = new SablierV2LockupLinear(
-            ownerB,
-            sablierV2ComptrollerB,
-            sablierV2NFTDescriptorB
-        );
-        streamCreatorB = new StreamCreator(lockupLinearB, address(tokenB));
-        streamCreatorB.setController(address(controllerB));
-        gameB.initialise(
-            tokenB,
-            gameAttestationB,
-            nftB,
-            streamCreatorB,
-            address(vrfConsumerB),
-            chainBNetworkDetails.chainSelector
-        );
-        gameB.setController(address(controllerB));
-        tokenB.setController(address(controllerB));
-        nftB.setController(address(controllerB));
-        controllerB.grantRole(controllerB.OWNER_ROLE(), address(gameB));
-        controllerB.grantRole(controllerB.OWNER_ROLE(), address(nftB));
-        controllerB.grantRole(controllerB.OWNER_ROLE(), address(tokenB));
-        controllerB.grantRole(
-            controllerB.OWNER_ROLE(),
-            address(streamCreatorB)
-        );
-        controllerB.grantRole(
-            controllerB.OWNER_ROLE(),
-            address(streamCreatorB)
-        );
-        gameAttestationB.setSPInstance(address(signProtocolB));
-        gameAttestationB.registerSchema(
-            Schema({
-                hook: ISPHook(address(0)), //@dev no hook for now
-                revocable: true,
-                registrant: address(gameAttestationB),
-                maxValidFor: 7 days,
-                timestamp: uint64(block.timestamp),
-                data: "{"
-                "name"
-                ":"
-                "No name Game Play Token"
-                ","
-                "description"
-                ":"
-                "Schema for Play token"
-                ", "
-                "data"
-                ":"
-                "[]"
-                "}",
-                dataLocation: DataLocation.ONCHAIN
-            })
-        );
-        gameB.setPrizePool(prizePool);
-        gameB.setPlayCost(COST_TO_PLAY);
-        _faucetMint(address(tokenB), ownerB, sphaB, 1000000000000 ether);
-        _faucetMint(address(tokenB), ownerB, mikeB, 1000000000000 ether);
-        _faucetMint(address(tokenB), ownerB, ownerB, 1000000000000 ether);
-        _faucetMint(
-            address(tokenB),
-            ownerB,
-            address(gameB),
-            10000000000000000 ether
-        );
-        vm.startPrank(ownerB);
-        tokenB.approve(address(gameB), type(uint256).max);
+        // Approve tokens for game
+        token.approve(address(game), type(uint256).max);
+
+        // Assign variables for Chain A or Chain B
+        if (keccak256(abi.encodePacked(chainLabel)) == keccak256("A")) {
+            sphaA = spha;
+            mikeA = mike;
+            ownerA = owner;
+            sphaPKA = sphaPK;
+            mikePKA = mikePK;
+            ownerPKA = ownerPK;
+            chainANetworkDetails = networkDetails;
+            vrfMockCoordinatorA = vrfMockCoordinator;
+            SUBSCRIPTION_IDA = subscriptionID;
+            vrfConsumerA = vrfConsumer;
+            controllerA = controller;
+            gameA = game;
+            gameAttestationA = gameAttestation;
+            signProtocolA = signProtocol;
+            tokenA = token;
+            nftA = nft;
+            lockupLinearA = lockupLinear;
+            streamCreatorA = streamCreator;
+        } else {
+            sphaB = spha;
+            mikeB = mike;
+            ownerB = owner;
+            sphaPKB = sphaPK;
+            mikePKB = mikePK;
+            ownerPKB = ownerPK;
+            chainBNetworkDetails = networkDetails;
+            vrfMockCoordinatorB = vrfMockCoordinator;
+            SUBSCRIPTION_IDB = subscriptionID;
+            vrfConsumerB = vrfConsumer;
+            controllerB = controller;
+            gameB = game;
+            gameAttestationB = gameAttestation;
+            signProtocolB = signProtocol;
+            tokenB = token;
+            nftB = nft;
+            sablierV2NFTDescriptorB = sablierV2NFTDescriptor;
+            lockupLinearB = lockupLinear;
+            streamCreatorB = streamCreator;
+        }
+
         vm.stopPrank();
-        vm.selectFork(chainAForkID);
-        vm.startPrank(ownerA);
-        ccipLocalSimulatorFork.requestLinkFromFaucet(address(gameA), 5 ether);
-        vm.selectFork(chainBForkID);
-        vm.startPrank(ownerB);
-        ccipLocalSimulatorFork.requestLinkFromFaucet(address(gameB), 5 ether);
+       }
+    }
+
+    function createUsers(
+        string memory chainLabel
+    ) internal returns (address, address, address, uint256, uint256, uint256) {
+        (address spha, uint256 sphaPK) = _createUser(
+            string(abi.encodePacked("sphaCHAIN", chainLabel))
+        );
+        (address mike, uint256 mikePK) = _createUser(
+            string(abi.encodePacked("mikeCHAIN", chainLabel))
+        );
+        (address owner, uint256 ownerPK) = _createUser(
+            string(abi.encodePacked("ownerCHAIN", chainLabel))
+        );
+        return (spha, mike, owner, sphaPK, mikePK, ownerPK);
+    }
+
+    function fundGameWithLink(
+        uint256 chainForkID,
+        address gameAddress,
+        address owner
+    ) internal {
+        vm.selectFork(chainForkID);
+        vm.startPrank(owner);
+        ccipLocalSimulatorFork.requestLinkFromFaucet(gameAddress, 5 ether);
+        vm.stopPrank();
     }
     function _createUser(
         string memory name
@@ -334,5 +336,20 @@ abstract contract BaseGameTest is Test, GameUtils {
         assert(Token(tokenAddress).balanceOf(whale) > 0);
         Token(tokenAddress).transfer(to, amount);
         vm.stopPrank();
+    }
+    function _createPrizePool() internal {
+        for (uint i = 0; i < 4; i++) {
+            prizePool.push(PoolPrize({prizeType: Prize.NFT, amount: 1}));
+        }
+        for (uint i = 0; i < 4; i++) {
+            prizePool.push(
+                PoolPrize({prizeType: Prize.Token, amount: 5 ether})
+            );
+        }
+        for (uint i = 0; i < 4; i++) {
+            prizePool.push(
+                PoolPrize({prizeType: Prize.Sablier, amount: 10 ether})
+            );
+        }
     }
 }

@@ -49,36 +49,23 @@ contract GameTest is BaseGameTest {
             ownerPKA,
             MessageHashUtils.toEthSignedMessageHash(hash)
         );
-        console.log("gameA.owner():", gameA.owner());
-        console.log(" owner:", ownerA);
-        require(gameA.owner() == ownerA, "Not owner");
-        bytes memory signedMessage = abi.encodePacked(r, s, v);
-        uint256[] memory sablierWins = new uint256[](3);
-        uint256[] memory nftWins = new uint256[](3);
-        uint256[] memory tokenWins = new uint256[](3);
-        sablierWins[0] = 0;
-        sablierWins[1] = 1;
-        sablierWins[2] = 2;
-        nftWins[0] = 0;
-        nftWins[1] = 1;
-        nftWins[2] = 2;
-        tokenWins[0] = 0;
-        tokenWins[1] = 1;
-        tokenWins[2] = 2;
-        console.log("ownerA: ", gameA.owner());
-        gameA.submitScore(
-            userScores,
-            signedMessage,
-            sablierWins,
-            nftWins,
-            tokenWins
+        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(
+            ownerPKA,
+            MessageHashUtils.toEthSignedMessageHash(
+                keccak256(abi.encodePacked(sphaA, block.chainid))
+            )
         );
-        assertEq(tokenA.balanceOf(sphaA), 1000000000010 ether);
-        assertEq(nftA.balanceOf(sphaA), 1);
+
+        bytes memory signedMessage = abi.encodePacked(r, s, v);
+        bytes memory signedMessage1 = abi.encodePacked(r1, s1, v1);
+        uint256[] memory wins = gameA.getWinnings(10, signedMessage1);
+        gameA.submitScore(userScores, signedMessage, wins);
+        assertEq(tokenA.balanceOf(sphaA), 1000000000000 ether);
+        assertEq(nftA.balanceOf(sphaA), 10);
 
         vm.stopPrank();
     }
-    function crossPlayChainA_B() public {
+    function test_crossPlayChainA_B() public {
         vm.selectFork(chainAForkID);
         vm.startPrank(sphaA);
         tokenA.approve(address(gameA), type(uint256).max);
@@ -89,7 +76,8 @@ contract GameTest is BaseGameTest {
         gameB.crossChainPlay(
             GameMessage({
                 player: sphaA,
-                reciever: address(gameA),
+                playerChainB: sphaB,
+                receiver: address(gameA),
                 messageType: MessageType.Verify,
                 validToken: false,
                 validUntil: 0
@@ -98,21 +86,77 @@ contract GameTest is BaseGameTest {
         );
         ccipLocalSimulatorFork.switchChainAndRouteMessage(chainAForkID);
         ccipLocalSimulatorFork.switchChainAndRouteMessage(chainBForkID);
+
         Player memory player = gameB.getPlayer(sphaB);
-        console.log("playerToken: ", player.token);
+        assertEq(player.player,sphaB);
         vm.stopPrank();
     }
-    event Here(uint256 indexed num);
+   function test_crossPlayChainA_B_Winnings() public {
+        vm.selectFork(chainAForkID);
+        vm.startPrank(sphaA);
+        tokenA.approve(address(gameA), type(uint256).max);
+        gameA.freePlay();
+        vm.stopPrank();
+        vm.selectFork(chainBForkID);
+        vm.startPrank(sphaB);
+        gameB.crossChainPlay(
+            GameMessage({
+                player: sphaA,
+                playerChainB: sphaB,
+                receiver: address(gameA),
+                messageType: MessageType.Verify,
+                validToken: false,
+                validUntil: 0
+            }),
+            uint64(chainANetworkDetails.chainSelector)
+        );
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(chainAForkID);
+        ccipLocalSimulatorFork.switchChainAndRouteMessage(chainBForkID);
+        vm.startPrank(sphaB);
+        Player memory player = gameB.getPlayer(sphaB);
+        assertEq(player.player,sphaB);
+        assertEq(player.token, 0);
+        vm.selectFork(chainAForkID);
+        uint256[] memory userScoresA = gameA.scores();
+        vm.selectFork(chainBForkID);
+        uint256[] memory userScoresB = gameB.scores();
+        vm.selectFork(chainBForkID);
+        uint256[] memory userScores = _mergeArrays(
+            userScoresA,
+            userScoresB,
+            1200
+        );
+        bytes32 hash = keccak256(
+            abi.encodePacked(userScores, ownerB, block.chainid)
+        );
+        (uint8 v, bytes32 r, bytes32 s) = vm.sign(
+            ownerPKB,
+            MessageHashUtils.toEthSignedMessageHash(hash)
+        );
+        (uint8 v1, bytes32 r1, bytes32 s1) = vm.sign(
+            ownerPKB,
+            MessageHashUtils.toEthSignedMessageHash(
+                keccak256(abi.encodePacked(sphaB, block.chainid))
+            )
+        );
+
+        bytes memory signedMessage = abi.encodePacked(r, s, v);
+        bytes memory signedMessage1 = abi.encodePacked(r1, s1, v1);
+        uint256[] memory wins = gameB.getWinnings(10, signedMessage1);
+        gameB.submitScore(userScores, signedMessage, wins);
+        assertEq(tokenB.balanceOf(sphaB), 1000000000000 ether);
+        assertEq(nftB.balanceOf(sphaB), 0);
+        vm.stopPrank();
+    }
     function _mergeArrays(
         uint256[] memory a,
         uint256[] memory b,
         uint256 score
-    ) public returns (uint256[] memory) {
+    ) public  pure returns (uint256[] memory) {
         uint256[] memory finalArray = new uint256[](a.length + b.length + 1);
         uint256 i;
         for (; i < a.length; i++) {
             finalArray[i] = a[i];
-            emit Here(finalArray[i]);
         }
         i = 0;
         for (; i < b.length; i++) {
