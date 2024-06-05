@@ -25,3 +25,5 @@ forkChainA.bash
 forkChainB.bash
 ./forkChainA.bash
 ./forkChainB.bash
+packages/contracts/forkChainA.bash
+packages/contracts/forkChainB.bash
