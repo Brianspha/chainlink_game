@@ -1,1 +1,0 @@
-anvil  --port 8546 --fork-url https://arbitrum-sepolia.infura.io/v3/25441638db5d4f86b757bc8be3fcda5f --fork-block-number 50994874  --fork-chain-id 421614  --no-rate-limit --mnemonic  "claw aware right regular security second any useless turkey agent eagle announce"  --gas-limit 30000000 --steps-tracing
