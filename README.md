@@ -123,38 +123,7 @@ Building this project has been an enlightening experience. Some of the key takea
 - Realizing the importance of robust access control and security measures.
 
 ## Run Locally  
-
-Clone the project:
-
-```bash  
-git clone https://link-to-project
-```
-
-Go to the project directory:
-
-```bash  
-cd my-project
-```
-
-Install dependencies:
-
-```bash  
-npm install
-```
-
-Start the server:
-
-```bash  
-npm run start
-```
-
-## Environment Variables  
-
-To run this project, you will need to add the following environment variables to your `.env` file:
-
-- `API_KEY`
-- `ANOTHER_API_KEY` 
-
+See Packages folder for individual project instructions
 ## Acknowledgements  
 
 - [Awesome Readme Templates](https://awesomeopensource.com/project/elangosundar/awesome-README-templates)
