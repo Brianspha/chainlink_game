@@ -30,11 +30,7 @@ interface IGameAttestation {
     /// @param attestationId The ID of the attestation
     /// @param user The address of the user
     /// @param game The address of the game
-    event GamePlayStarted(
-        uint64 indexed attestationId,
-        address indexed user,
-        address indexed game
-    );
+    event GamePlayStarted(uint64 indexed attestationId, address indexed user, address indexed game);
 
     /// @notice Sets the instance of the Sign Protocol to be used
     /// @param instance Address of the Sign Protocol instance
@@ -48,7 +44,5 @@ interface IGameAttestation {
     /// @dev This function is used to issue playtokens for any user
     /// @param attestation The attestation details for the game play
     /// @return attestationId The ID of the created attestation
-    function attestGamePlay(
-        GamePlayAttestation memory attestation
-    ) external returns (uint64);
+    function attestGamePlay(GamePlayAttestation memory attestation) external returns (uint64);
 }

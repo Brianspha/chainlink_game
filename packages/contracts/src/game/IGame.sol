@@ -11,10 +11,7 @@ interface IGame is GameUtils {
     /// @param totalCollected The total number of game items collected in the game
     /// @param signature The signature to verify the legitimacy of the submission; this uses the owner of the contract's signature (see implementation)
     /// @return items The array of random numbers representing the winnings
-    function getWinnings(
-        uint16 totalCollected,
-        bytes calldata signature
-    ) external returns (uint256[] memory items);
+    function getWinnings(uint16 totalCollected, bytes calldata signature) external returns (uint256[] memory items);
 
     /// @notice Returns the prize pool set for the game
     /// @return pool An array of PoolPrize structures representing the prize pool
@@ -45,10 +42,9 @@ interface IGame is GameUtils {
     /// @param message The game message containing play token details from Chain B
     /// @param destinationChainSelector The chain selector for the destination chain
     /// @return messageId The message ID for tracking the cross-chain transaction
-    function crossChainPlay(
-        GameMessage memory message,
-        uint64 destinationChainSelector
-    ) external returns (bytes32 messageId);
+    function crossChainPlay(GameMessage memory message, uint64 destinationChainSelector)
+        external
+        returns (bytes32 messageId);
 
     /// @notice Sets the cost to play the game
     /// @param cost The new cost to play the game
@@ -57,22 +53,22 @@ interface IGame is GameUtils {
     /// @notice Submits a user's score together with a signature from the off-chain game
     /// @dev Ensures the game was played within the client and not submitted via Etherscan. Uses ECDSA to verify that the scores were submitted via the game
     /// @param userScores An array of user scores to submit
+    /// @param addressScores An array of user addresses each address is 1 to 1 with the userscores param
     /// @param signature The signature to verify the legitimacy of the submission (see implementation)
     /// @param winnings The array of indexes representing the prizes the user has won
     function submitScore(
         uint256[] memory userScores,
+        address[] memory addressScores,
         bytes calldata signature,
         uint256[] memory winnings
     ) external;
 
     /// @notice Returns the scores of all players
     /// @return An array of scores
-    function scores() external view returns (uint256[] memory);
+    function scores() external view returns (uint256[] memory, address[] memory);
 
     /// @notice Returns the details of a player
     /// @param player_ The address of the player to retrieve
     /// @return player A Player structure containing the player's details
-    function getPlayer(
-        address player_
-    ) external view returns (Player memory player);
+    function getPlayer(address player_) external view returns (Player memory player);
 }

@@ -21,3 +21,5 @@ out.json
 bloat*
 
 node_modules
+forkChainA.bash
+forkChainB.bash

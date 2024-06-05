@@ -12,10 +12,13 @@
       <span class="header-chain">CHAIN</span>
       <span class="header-score">SCORE</span>
     </div>
+    <v-row v-if="$store.state.leaderBoard.length === 0" justify="center" align="center">
+      No Players yet!!
+    </v-row>
     <ol class="leaderboard-list">
-      <li v-for="(player, index) in players" :key="index" :class="{ 'top-three': index < 3 }">
+      <li v-for="(player, index) in $store.state.leaderBoard" :key="index" :class="{ 'top-three': index < 3 }">
         <span class="rank">{{ index + 1 }}</span>
-        <span class="name">{{ player.name }}</span>
+        <a :href=player.name> <span class="name">{{ player.namesub }}</span></a>
         <span class="chain">{{ player.chain }}</span>
         <span class="score">{{ player.score }}</span>
       </li>
@@ -42,6 +45,10 @@ export default {
       ],
     };
   },
+  async beforeMount() {
+    await this.$store.dispatch("connectWallet")
+    await this.$store.dispatch("getLeaderBoard")
+  }
 };
 </script>
 

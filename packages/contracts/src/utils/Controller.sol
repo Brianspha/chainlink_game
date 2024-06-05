@@ -9,7 +9,7 @@ import {AccessControl} from "@openzeppelin/contracts/access/AccessControl.sol";
 contract Controller is AccessControl {
     /// @notice Role identifier for the owner role
     bytes32 public constant OWNER_ROLE = keccak256("OWNER_ROLE");
-    
+
     /// @notice Role identifier for the game controller role
     bytes32 public constant GAME_CONTROLLER = keccak256("GAME_CONTROLLER");
 

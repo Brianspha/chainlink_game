@@ -14,6 +14,7 @@ contract GameFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     IGameAttestation public tokenAttestor;
     address[] public gameInstances;
     // events
+
     event IPDeployed(address indexed user, address indexed ipHolder);
 
     /**
@@ -27,6 +28,7 @@ contract GameFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable {
     }
 
     function deployGame() public returns (Game) {}
+
     function allInstances() public view returns (address[] memory) {
         return gameInstances;
     }
@@ -36,7 +38,5 @@ contract GameFactory is Initializable, UUPSUpgradeable, OwnableUpgradeable {
      * Ensures that only the owner of the contract can authorize upgrades.
      * @param newImplementation The address of the new contract implementation to upgrade to.
      */
-    function _authorizeUpgrade(
-        address newImplementation
-    ) internal override onlyOwner {}
+    function _authorizeUpgrade(address newImplementation) internal override onlyOwner {}
 }

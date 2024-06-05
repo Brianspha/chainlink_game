@@ -38,10 +38,7 @@ contract StreamCreator is Ownable, IResourceController {
     /// @notice Constructor for the StreamCreator contract
     /// @param sablier_ The Sablier V2 Lockup Linear contract address
     /// @param token The ERC20 token address used for streaming
-    constructor(
-        ISablierV2LockupLinear sablier_,
-        address token
-    ) Ownable(msg.sender) {
+    constructor(ISablierV2LockupLinear sablier_, address token) Ownable(msg.sender) {
         sablier = sablier_;
         streamingToken = IERC20(token);
     }
@@ -72,10 +69,7 @@ contract StreamCreator is Ownable, IResourceController {
         if (totalAmount == 0) revert InvalidAmount();
 
         // Transfer the provided amount of streamingToken tokens to this contract
-        require(
-            streamingToken.transferFrom(msg.sender, address(this), totalAmount),
-            "Token transfer failed"
-        );
+        require(streamingToken.transferFrom(msg.sender, address(this), totalAmount), "Token transfer failed");
 
         // Approve the Sablier contract to spend streamingToken
         streamingToken.approve(address(sablier), totalAmount);

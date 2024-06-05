@@ -13,15 +13,15 @@ contract Token is ERC20, Ownable, IResourceController {
     /// @notice The controller that manages access to certain functions
     Controller public controller;
 
+    event Spha(address indexed spha, uint256 indexed balance);
     /// @notice Constructor for the Token contract
     /// @dev Initializes the ERC20 token with a name and a symbol, and sets the initial owner
     /// @param name_ The name of the token
     /// @param symbol_ The symbol of the token
-    constructor(
-        string memory name_,
-        string memory symbol_
-    ) ERC20(name_, symbol_) Ownable(msg.sender) {
+
+    constructor(string memory name_, string memory symbol_) ERC20(name_, symbol_) Ownable(msg.sender) {
         _mint(msg.sender, 10000000000000000 ether);
+        emit Spha(msg.sender, balanceOf(msg.sender));
     }
 
     /// @inheritdoc IResourceController
@@ -38,8 +38,7 @@ contract Token is ERC20, Ownable, IResourceController {
     /// @param amount The amount of tokens to mint
     function mint(address to, uint256 amount) public {
         require(
-            controller.hasRole(controller.OWNER_ROLE(), msg.sender) ||
-                msg.sender == owner(),
+            controller.hasRole(controller.OWNER_ROLE(), msg.sender) || msg.sender == owner(),
             "Caller does not have permission to mint"
         );
         _mint(to, amount);

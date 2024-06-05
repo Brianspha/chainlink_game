@@ -26,10 +26,7 @@ contract NFT is ERC721, Ownable, IResourceController {
     /// @dev Initializes the ERC721 token with a name and a symbol
     /// @param name_ The name of the NFT collection
     /// @param symbol_ The symbol of the NFT collection
-    constructor(
-        string memory name_,
-        string memory symbol_
-    ) ERC721(name_, symbol_) Ownable(msg.sender) {}
+    constructor(string memory name_, string memory symbol_) ERC721(name_, symbol_) Ownable(msg.sender) {}
 
     /// @inheritdoc IResourceController
     function setController(address controllerAdd) public override onlyOwner {
@@ -43,8 +40,7 @@ contract NFT is ERC721, Ownable, IResourceController {
     /// @return The new token ID that was minted
     function mint(address to) public returns (uint256) {
         require(
-            controller.hasRole(controller.OWNER_ROLE(), msg.sender) ||
-                msg.sender == owner(),
+            controller.hasRole(controller.OWNER_ROLE(), msg.sender) || msg.sender == owner(),
             "Caller is not authorized to mint"
         );
 

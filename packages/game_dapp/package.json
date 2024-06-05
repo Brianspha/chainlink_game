@@ -15,6 +15,7 @@
     "@zimjs/game": "^2.8.6",
     "bignumber.js": "^9.1.2",
     "core-js": "^3.8.3",
+    "dotenv": "^16.4.5",
     "roboto-fontface": "*",
     "sweetalert2": "^11.11.0",
     "viem": "^2.13.3",

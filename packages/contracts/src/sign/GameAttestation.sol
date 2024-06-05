@@ -35,19 +35,20 @@ contract GameAttestation is IGameAttestation, IResourceController, Ownable {
     }
 
     /// @inheritdoc IGameAttestation
-    function registerSchema(
-        Schema memory schema
-    ) external override onlyWhenSpInitialized {
+    function registerSchema(Schema memory schema) external override onlyWhenSpInitialized {
         require(controller.hasRole(controller.OWNER_ROLE(), msg.sender), "Caller does not have owner role");
         schemaId = spInstance.register(schema, "");
     }
 
     /// @inheritdoc IGameAttestation
-    function attestGamePlay(
-        GamePlayAttestation memory attestation
-    ) external override onlyWhenSpInitialized returns (uint64) {
+    function attestGamePlay(GamePlayAttestation memory attestation)
+        external
+        override
+        onlyWhenSpInitialized
+        returns (uint64)
+    {
         require(controller.hasRole(controller.OWNER_ROLE(), msg.sender), "Caller does not have owner role");
-        
+
         Attestation memory playID = Attestation({
             schemaId: schemaId,
             linkedAttestationId: 0,

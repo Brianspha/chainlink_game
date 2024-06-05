@@ -53,8 +53,10 @@ contract GameDeployerScript is Script, GameUtils, JsonDeploymentHandler {
     CCIPLocalSimulatorFork public ccipLocalSimulatorFork;
     Register.NetworkDetails public chainNetworkDetails;
     Register.NetworkDetails chainBNetworkDetails;
+
     constructor() JsonDeploymentHandler("main") {}
     function setUp() public virtual {}
+
     function run() public {
         uint256 deployerPrivateKey = vm.envUint("PRIVATE_KEY");
         vm.startBroadcast(deployerPrivateKey);
@@ -64,7 +66,7 @@ contract GameDeployerScript is Script, GameUtils, JsonDeploymentHandler {
         // Set up Chain A
         owner = vm.addr(deployerPrivateKey);
         setupChain();
-         _postdeploy("SablierV2LockupLinear", address(lockupLinear));
+        _postdeploy("SablierV2LockupLinear", address(lockupLinear));
         _postdeploy("SablierV2NFTDescriptor", address(sablierV2NFTDescriptor));
         _postdeploy("VRFCoordinatorV2Mock", address(vrfMockCoordinator));
         _postdeploy("VRFConsumerMod", address(vrfConsumer));
@@ -75,31 +77,24 @@ contract GameDeployerScript is Script, GameUtils, JsonDeploymentHandler {
         _postdeploy("Token", address(token));
         _postdeploy("Controller", address(controller));
         _postdeploy("Game", address(game));
-        _writeDeployment(false,"./deploy-out/deploymentArbitrum.json");
+        _writeDeployment(false, "./deploy-out/deploymentArbitrum.json");
     }
+
     function setupChain() internal {
-        Register.NetworkDetails memory networkDetails = ccipLocalSimulatorFork
-            .getNetworkDetails(421614);
+        Register.NetworkDetails memory networkDetails = ccipLocalSimulatorFork.getNetworkDetails(421614);
 
         // Set up VRF
         vrfMockCoordinator = new VRFCoordinatorV2Mock(BASEFEE, GASPRICELINK);
         uint64 subscriptionID = vrfMockCoordinator.createSubscription();
-        vrfConsumer = new VRFConsumerMod(
-            subscriptionID,
-            prizePool.length + 5,
-            address(vrfMockCoordinator)
-        );
-        vrfMockCoordinator.fundSubscription(subscriptionID, 10000 ether);
+        vrfConsumer = new VRFConsumerMod(subscriptionID, prizePool.length + 5, address(vrfMockCoordinator));
+        vrfMockCoordinator.fundSubscription(subscriptionID, 10000000 ether);
         vrfMockCoordinator.addConsumer(subscriptionID, address(vrfConsumer));
 
         // Set up Controller
         controller = new Controller();
 
         // Set up Game
-        game = new Game(
-            address(networkDetails.routerAddress),
-            address(networkDetails.linkAddress)
-        );
+        game = new Game(address(networkDetails.routerAddress), address(networkDetails.linkAddress));
 
         // Set up GameAttestation
         gameAttestation = new GameAttestation();
@@ -112,27 +107,14 @@ contract GameDeployerScript is Script, GameUtils, JsonDeploymentHandler {
         nft = new NFT("PlayNFT", "PNFT");
 
         // Set up Sablier
-        SablierV2Comptroller sablierV2Comptroller = new SablierV2Comptroller(
-            owner
-        );
+        SablierV2Comptroller sablierV2Comptroller = new SablierV2Comptroller(owner);
         sablierV2NFTDescriptor = new SablierV2NFTDescriptor();
         {
-            lockupLinear = new SablierV2LockupLinear(
-                owner,
-                sablierV2Comptroller,
-                sablierV2NFTDescriptor
-            );
+            lockupLinear = new SablierV2LockupLinear(owner, sablierV2Comptroller, sablierV2NFTDescriptor);
             streamCreator = new StreamCreator(lockupLinear, address(token));
 
             // Initialize game
-            game.initialise(
-                token,
-                gameAttestation,
-                nft,
-                streamCreator,
-                address(vrfConsumer),
-                networkDetails.chainSelector
-            );
+            game.initialise(token, gameAttestation, nft, streamCreator, address(vrfConsumer), 16015286601757825753);
 
             // Set controllers
             vrfConsumer.setController(address(controller));
@@ -146,10 +128,7 @@ contract GameDeployerScript is Script, GameUtils, JsonDeploymentHandler {
             controller.grantRole(controller.OWNER_ROLE(), address(game));
             controller.grantRole(controller.OWNER_ROLE(), address(nft));
             controller.grantRole(controller.OWNER_ROLE(), address(token));
-            controller.grantRole(
-                controller.OWNER_ROLE(),
-                address(streamCreator)
-            );
+            controller.grantRole(controller.OWNER_ROLE(), address(streamCreator));
 
             // Set up GameAttestation
             gameAttestation.setSPInstance(address(signProtocol));
@@ -160,11 +139,7 @@ contract GameDeployerScript is Script, GameUtils, JsonDeploymentHandler {
                     registrant: address(gameAttestation),
                     maxValidFor: 7 days,
                     timestamp: uint64(block.timestamp),
-                    data: "{"
-                    '"name":"No name Game Play Token",'
-                    '"description":"Schema for Play token",'
-                    '"data":[]'
-                    "}",
+                    data: "{" '"name":"No name Game Play Token",' '"description":"Schema for Play token",' '"data":[]' "}",
                     dataLocation: DataLocation.ONCHAIN
                 })
             );
@@ -182,32 +157,24 @@ contract GameDeployerScript is Script, GameUtils, JsonDeploymentHandler {
             SUBSCRIPTION_ID = subscriptionID;
         }
     }
+
     function _createPrizePool() internal {
-        for (uint i = 0; i < 4; i++) {
+        for (uint256 i = 0; i < 4; i++) {
             prizePool.push(PoolPrize({prizeType: Prize.NFT, amount: 1}));
         }
-        for (uint i = 0; i < 4; i++) {
-            prizePool.push(
-                PoolPrize({prizeType: Prize.Token, amount: 5 ether})
-            );
+        for (uint256 i = 0; i < 4; i++) {
+            prizePool.push(PoolPrize({prizeType: Prize.Token, amount: 5 ether}));
         }
-        for (uint i = 0; i < 4; i++) {
-            prizePool.push(
-                PoolPrize({prizeType: Prize.Sablier, amount: 10 ether})
-            );
+        for (uint256 i = 0; i < 4; i++) {
+            prizePool.push(PoolPrize({prizeType: Prize.Sablier, amount: 10 ether}));
         }
     }
-    function _faucetMint(
-        address tokenAddress,
-        address to,
-        uint256 amount
-    ) internal {
+
+    function _faucetMint(address tokenAddress, address to, uint256 amount) internal {
         Token(tokenAddress).mint(to, amount);
     }
-       function _postdeploy(
-        string memory contractKey,
-        address newAddress
-    ) private {
+
+    function _postdeploy(string memory contractKey, address newAddress) private {
         _writeAddress(contractKey, newAddress);
         console2.log(string.concat(contractKey, " deployed to:"), newAddress);
     }

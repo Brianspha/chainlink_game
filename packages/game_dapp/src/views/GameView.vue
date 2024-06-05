@@ -13,7 +13,7 @@ import {
     timeout,
     Flipper,
     Tabs,
-    shuffle, Bitmap, Pane, Ticker, Button, Boundary, MotionController, Emitter, Shape, Frame,
+    Pic, Bitmap, Pane, Ticker, Button, Boundary, MotionController, Emitter, Shape, Frame,
     Circle, Tile, Container, Rectangle, rand, Blob, Label, series
 } from 'zimjs';
 
@@ -28,11 +28,11 @@ const paused = computed(() => store.state.paused);
 const basePoints = computed(() => store.state.basePoints);
 const score = computed(() => store.state.score);
 const winnings = computed(() => store.state.winnings);
-console.log("winnings: ", store.state.time)
 let speed = 0;
 let winingCards = []
 let snap = null;
 let mapCheck = false;
+let winningsIndex = 0
 let player;
 let controller;
 let world;
@@ -58,8 +58,12 @@ let loadingAnimation;
 let mainMenuOptions;
 let leaderboard
 let cardsContainer;
-let winningsIndex;
+
 function initGame() {
+    if (!store.state.canPlay) {
+        createGame()
+        return
+    }
     console.log('ready from ZIM Frame'); // logs in console (F12 - choose console)
     stageW = frame.value.width;
     stageH = frame.value.height;
@@ -202,20 +206,20 @@ function update() {
 
     tile.loop((dot, i) => {
         if (paused.value) {
-            console.log("paaaasued: ", paused.value)
             return
         }
         if (paused.value) return;
         if (player.color === currentColor && player.hitTestCircle(dot) && dot.color === currentColor) {
             store.state.incrementCollected++;
             const comboMultiplier = store.state.incrementCollected > 1 ? store.state.incrementCollected : 1;
-            const timeBonus = Math.floor(timer.time / 10);
+            const timeBonus = Math.floor(timer.time / Math.round(Math.random() * timer.time));
             const difficultyMultiplier = currentLevel.value;
             const scoreIncrement = basePoints.value * comboMultiplier + timeBonus * difficultyMultiplier;
             scorer.score += scoreIncrement;
             store.state.score += scoreIncrement
-            const timeIncrement = basePoints.value * 0.1;
+            const timeIncrement = basePoints.value * 0.8;
             timer.time += timeIncrement;
+            store.state.currentLevelTime += timeIncrement
             stars.loc(dot).spurt(5);
             dot.removeFrom();
             stage.update();
@@ -257,7 +261,6 @@ function showMap() {
     player.addTo(tile);
     tile.scaleTo(stage, 70, 70);
     snap = new Bitmap(world).center();
-    console.log("tile before: ", tile)
     tile.sca(1);
     player.addTo(world);
     world.visible = false;
@@ -318,12 +321,14 @@ function createGame() {
         frame.value.dispose();
     }
     frame.value = new Frame({
-        scaling: 'fit', // Make sure this is set to fit or a similar option
+        scaling: 'fit',
         width: window.innerWidth,
         height: window.innerHeight,
         color: 'lighter',
         outerColor: 'grey',
-        mouseMoveOutside: true, // so Pen and Dial work better
+        mouseMoveOutside: true,
+        assets: ["404.jpeg", "erc20.png", "sablier.jpeg", "nft.jpeg"],
+        path: "src/assets/zim/",
         ready: () => {
             loadingAnimation = new Container(window.innerWidth, window.innerHeight).addTo();
             new Blob({
@@ -352,29 +357,61 @@ function createGame() {
             }).show();
             mainMenu.mov(0, -20)
             mainMenuOptions = new Tabs({
-                width: 600,
+                width: 800,
                 height: 60,
-                tabs: ["Play", "Leaderboard", "About"],
+                tabs: ["Play", "Free Play", "Leaderboard"],
                 currentSelected: false,
                 spacing: 30,
                 backgroundColor: yellow,
                 rollBackgroundColor: 'transparent',
                 color: black,
                 corner: 20
-            }).center(mainMenu).mov(10, 120).tap(function () {
+            }).center(mainMenu).mov(10, 120).tap(async function () {
                 switch (mainMenuOptions.text) {
                     case "Play":
-                        hideMenu()
-                        initGame()
+                        if (store.state.connected && store.state.canPlay) {
+                            hideMenu()
+                            initGame()
+                        }
+                        else {
+                            await store.dispatch("connectWallet")
+                            if (!store.state.connected) {
+                                store.dispatch("warning", "Please connect your metamask to play")
+                            }
+                            else {
+                                const success = await store.dispatch("paidPlay")
+                                if (success) {
+                                    hideMenu()
+                                    initGame()
+                                }
+                            }
+                        }
+                        break;
+                    case "Free Play":
+                        if (store.state.connected) {
+                            hideMenu()
+                            initGame()
+                        }
+                        else {
+                            await store.dispatch("connectWallet")
+                            if (!store.state.connected) {
+                                store.dispatch("warning", "Please connect your metamask to play")
+                            }
+                            else {
+                                const success = await store.dispatch("freePlay")
+                                if (success) {
+                                    hideMenu()
+                                    initGame()
+                                }
+
+                            }
+                        }
                         break;
                     case "Leaderboard":
                         showLeaderBoard()
                         break;
-                    case "About":
-                        initGame()
-                        break;
                     default:
-                        initGame()
+                        createGame()
                         break;
                 }
             })
@@ -388,23 +425,52 @@ function hideGame() {
     stage.update();
 }
 function makeCard() {
-    hideGame()
-    let front = stage.frame.makeIcon().sca(0.8);
+    hideGame();
+
+    const nftImageURL = "src/assets/zim/nft.jpeg";
+    const erc20ImageURL = "src/assets/zim/erc20.png";
+    const sablierFinanceLogoURL = "src/assets/zim/sablier.jpeg";
+
     let answer = winnings.value[winningsIndex++];
-    let back = new Rectangle(front.width, front.height, answer);
+    const prizeType = store.state.prizePool[answer]
+    let backImageURL = "src/assets/zim/404.jpeg";
+
+    if (prizeType && prizeType.prizeType === 0) {
+        backImageURL = erc20ImageURL;
+    } else if (prizeType && prizeType.prizeType === 1) {
+        backImageURL = sablierFinanceLogoURL;
+    } else if (prizeType && prizeType.prizeType === 2) {
+        backImageURL = nftImageURL;
+    }
+
+
+    let front = stage.frame.makeIcon().sca(0.8);
+
+
+    let back = new Rectangle(front.width, front.height, "transparent").centerReg({ add: false });
+
+
+    let backIcon = new new Pic(backImageURL)
+        .setBounds(0, 0, front.width / 2, front.height / 2) // Set explicit dimensions
+        .sca(0.15)
+        .centerReg(back);
+
+
     let card = new Flipper(front, back, null, null, null, null, null, false, false).centerReg({ add: false });
     card.answer = answer;
     return card;
-} async function showWinnings() {
+}
+
+
+async function showWinnings() {
     await store.dispatch("getWinnings")
-    console.log("winnings: ", winnings.value)
+
     if (cardsContainer) {
         cardsContainer.removeFrom()
     }
     const winningsLength = winnings.value.length;
-    const cols = Math.floor(Math.sqrt(winningsLength)); // Calculate columns based on the square root of the length
-    const rows = Math.floor(winningsLength / cols); // Calculate rows based on the total number of items and columns
-    console.log(cols, rows)
+    const cols = Math.floor(Math.sqrt(winningsLength));
+    const rows = Math.floor(winningsLength / cols);
     cardsContainer = new Tile({
         obj: makeCard,
         cols: cols,
@@ -462,6 +528,7 @@ function makeCard() {
         corner: 40
     }).addTo(mainMenu).tap(async function () {
         await store.dispatch("claimWinnings")
+        createGame()
     });
     const toMenuButton = new Button({
         label: "Goto Menu",

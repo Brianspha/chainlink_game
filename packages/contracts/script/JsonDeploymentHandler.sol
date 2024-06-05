@@ -21,9 +21,7 @@ contract JsonDeploymentHandler is Script {
         key = _key;
     }
 
-    function _readAddress(
-        string memory readPath
-    ) internal view returns (address) {
+    function _readAddress(string memory readPath) internal view returns (address) {
         try vm.parseJsonAddress(readJson, readPath) returns (address addr) {
             return addr;
         } catch {
@@ -38,34 +36,19 @@ contract JsonDeploymentHandler is Script {
         readJson = vm.readFile(path);
     }
 
-    function _writeAddress(
-        string memory contractKey,
-        address newAddress
-    ) internal {
+    function _writeAddress(string memory contractKey, address newAddress) internal {
         output = vm.serializeAddress(internalKey, contractKey, newAddress);
     }
 
-    function _writeToJson(
-        string memory contractKey,
-        string memory value
-    ) internal {
-        vm.writeJson(
-            value,
-            string.concat("./deploy-out/deploymentTx.json"),
-            contractKey
-        );
+    function _writeToJson(string memory contractKey, string memory value) internal {
+        vm.writeJson(value, string.concat("./deploy-out/deploymentTx.json"), contractKey);
     }
 
-    function _writeDeployment(bool withKey,string memory fileName) internal {
+    function _writeDeployment(bool withKey, string memory fileName) internal {
         if (withKey) {
-            vm.writeJson(
-                output,
-                fileName,
-                string.concat(".", key)
-            );
+            vm.writeJson(output, fileName, string.concat(".", key));
         } else {
             vm.writeJson(output, fileName);
         }
     }
-  
 }
