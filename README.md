@@ -52,8 +52,11 @@ This contract routes any interactions with external contracts such as:
 The game contract is the heart of the entire system. Players have three ways to play the game:
 - **Free Play**: Redeem a free play token valid for three days.
 - **Paid Play**: Purchase a play token valid for seven days. Each play token costs a defined number of units of the PlayToken.
-- **Cross Play**: Use a token from another chain to play, provided a token was purchased or claimed on that chain.
+- **Cross Play**: Use a token from another chain to play, provided a token was purchased or claimed on that chain. The cross chain communication is facilliated by chainlinks CCIP infrustructure where a player on chain A sends a <b>message</b> to chain b the exact implementation can be found here: <br/>
+- **Send message Chain A**: https://github.com/Brianspha/chainlink_game/blob/main/packages/contracts/src/game/Game.sol#L249
+- **Recieve Message from Chain A**: https://github.com/Brianspha/chainlink_game/blob/main/packages/contracts/src/game/Game.sol#L364
 
+This works vice versa aswell 
 ### NFT Contract
 The NFT contract is used to reward users who have collected in-game items.
 

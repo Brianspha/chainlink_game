@@ -23,3 +23,5 @@ bloat*
 node_modules
 forkChainA.bash
 forkChainB.bash
+./forkChainA.bash
+./forkChainB.bash
