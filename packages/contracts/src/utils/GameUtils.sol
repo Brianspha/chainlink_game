@@ -19,27 +19,39 @@ interface GameUtils {
     }
 
     /// @notice Structure representing a prize in the prize pool.
+    /// @param prizeType Type of the prize.
+    /// @param amount Amount or value of the prize.
     struct PoolPrize {
-        Prize prizeType; // Type of the prize.
-        uint256 amount; // Amount or value of the prize.
+        Prize prizeType; 
+        uint256 amount; 
     }
 
     /// @notice Structure representing a player in the game.
+    /// @param player Address of the player.
+    /// @param collected Number of collected items or points.
+    /// @param token Token associated with the player i.e. The Attestation ID.
+    /// @param score Score of the player.
     struct Player {
-        address player; // Address of the player.
-        uint16 collected; // Number of collected items or points.
-        uint64 token; // Token associated with the player.
-        uint256 score; // Score of the player.
+        address player; 
+        uint16 collected;
+        uint64 token; 
+        uint64 score; 
     }
 
     /// @notice Structure representing a message sent between chains.
+    /// @param player Address of the player.
+    /// @param playerChainB Address of the player on chain B.
+    /// @param receiver Address of the receiver.
+    /// @param messageType Type of the message.
+    /// @param validToken Token associated with the message.
+    /// @param validUntil Expiry time of the token.
     struct GameMessage {
-        address player; // Address of the player.
-        address playerChainB; // Address of the player on chain B.
-        address receiver; // Address of the receiver on the destination chain.
-        MessageType messageType; // Type of the message.
-        bool validToken; // Indicates if the token is valid.
-        uint64 validUntil; // Expiration time of the token.
+        address player; 
+        address playerChainB; 
+        address receiver; 
+        MessageType messageType;
+        bool validToken; 
+        uint64 validUntil;
     }
 
     /// @notice Event emitted when a message is sent to another chain.
@@ -62,7 +74,10 @@ interface GameUtils {
     /// @param sender The address of the sender from the source chain.
     /// @param message The message that was received.
     event MessageReceived(
-        bytes32 indexed messageId, uint64 indexed sourceChainSelector, address sender, GameMessage message
+        bytes32 indexed messageId,
+        uint64 indexed sourceChainSelector,
+        address sender,
+        GameMessage message
     );
 
     /// @notice Event emitted when the game prize is set.
@@ -85,13 +100,21 @@ interface GameUtils {
     /// @param player The address of the player.
     /// @param amount The amount associated with the free play.
     /// @param playTokenId The token id issued by the sign protocol
-    event FreePlay(address indexed player, uint256 indexed amount, uint64 indexed playTokenId);
+    event FreePlay(
+        address indexed player,
+        uint256 indexed amount,
+        uint64 indexed playTokenId
+    );
 
     /// @notice Event emitted when a player pays to play.
     /// @param player The address of the player.
     /// @param amount The amount paid to play.
     /// @param playTokenId The token id issued by the sign protocol
-    event PaidPlay(address indexed player, uint256 indexed amount, uint64 indexed playTokenId);
+    event PaidPlay(
+        address indexed player,
+        uint256 indexed amount,
+        uint64 indexed playTokenId
+    );
 
     /// @notice Event emitted when the cost to play the game is updated.
     /// @param from The previous cost to play.

@@ -11,7 +11,10 @@ interface IGame is GameUtils {
     /// @param totalCollected The total number of game items collected in the game
     /// @param signature The signature to verify the legitimacy of the submission; this uses the owner of the contract's signature (see implementation)
     /// @return items The array of random numbers representing the winnings
-    function getWinnings(uint16 totalCollected, bytes calldata signature) external returns (uint256[] memory items);
+    function getWinnings(
+        uint16 totalCollected,
+        bytes calldata signature
+    ) external returns (uint256[] memory items);
 
     /// @notice Returns the prize pool set for the game
     /// @return pool An array of PoolPrize structures representing the prize pool
@@ -42,9 +45,10 @@ interface IGame is GameUtils {
     /// @param message The game message containing play token details from Chain B
     /// @param destinationChainSelector The chain selector for the destination chain
     /// @return messageId The message ID for tracking the cross-chain transaction
-    function crossChainPlay(GameMessage memory message, uint64 destinationChainSelector)
-        external
-        returns (bytes32 messageId);
+    function crossChainPlay(
+        GameMessage memory message,
+        uint64 destinationChainSelector
+    ) external returns (bytes32 messageId);
 
     /// @notice Sets the cost to play the game
     /// @param cost The new cost to play the game
@@ -65,10 +69,21 @@ interface IGame is GameUtils {
 
     /// @notice Returns the scores of all players
     /// @return An array of scores
-    function scores() external view returns (uint256[] memory, address[] memory);
+    function scores()
+        external
+        view
+        returns (uint256[] memory, address[] memory);
 
     /// @notice Returns the details of a player
     /// @param player_ The address of the player to retrieve
     /// @return player A Player structure containing the player's details
-    function getPlayer(address player_) external view returns (Player memory player);
+    function getPlayer(
+        address player_
+    ) external view returns (Player memory player);
+
+    /// @notice Allows a player to pay the cost of playing a game
+    /// @param periodInDays The period in days the play token is to last for
+    /// @dev Issues an attestation ID using the Sign protocol representing the play token for the player
+    /// @return ok A boolean value indicating whether the operation was successful
+    function play(uint64 periodInDays) external returns (bool ok);
 }
