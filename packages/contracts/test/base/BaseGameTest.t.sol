@@ -82,8 +82,8 @@ abstract contract BaseGameTest is Test, GameUtils {
         CHAINB_RPC = vm.envString("ARBITRUM_SEPOLIA_RPC_URL");
 
         // Create and select forks for both chains
-        chainAForkID = vm.createSelectFork(CHAINA_RPC, 6028236);
-        chainBForkID = vm.createFork(CHAINB_RPC, 50643503);
+        chainAForkID = vm.createSelectFork(CHAINA_RPC);
+        chainBForkID = vm.createFork(CHAINB_RPC);
 
         // Initialize CCIP local simulator fork
         ccipLocalSimulatorFork = new CCIPLocalSimulatorFork();
@@ -99,20 +99,47 @@ abstract contract BaseGameTest is Test, GameUtils {
         fundGameWithLink(chainAForkID, address(gameA), ownerA);
         fundGameWithLink(chainBForkID, address(gameB), ownerB);
     }
-
-    function setupChain(uint256 chainForkID, string memory chainLabel) internal {
+    modifier whenPlayerHasZeroBalance(
+        address player,
+        Token token,
+        uint256 chainForkID
+    ) {
         vm.selectFork(chainForkID);
-        (address spha, address mike, address owner, uint256 sphaPK, uint256 mikePK, uint256 ownerPK) =
-            createUsers(chainLabel);
+        vm.startPrank(player);
+        token.approve(address(this), type(uint256).max);
+        token.transfer(address(this), token.balanceOf(player));
+        vm.stopPrank();
+        _;
+    }
+    function setupChain(
+        uint256 chainForkID,
+        string memory chainLabel
+    ) internal {
+        vm.selectFork(chainForkID);
+        (
+            address spha,
+            address mike,
+            address owner,
+            uint256 sphaPK,
+            uint256 mikePK,
+            uint256 ownerPK
+        ) = createUsers(chainLabel);
 
-        Register.NetworkDetails memory networkDetails = ccipLocalSimulatorFork.getNetworkDetails(block.chainid);
+        Register.NetworkDetails memory networkDetails = ccipLocalSimulatorFork
+            .getNetworkDetails(block.chainid);
         vm.startPrank(owner);
 
         // Set up VRF
-        VRFCoordinatorV2Mock vrfMockCoordinator = new VRFCoordinatorV2Mock(BASEFEE, GASPRICELINK);
+        VRFCoordinatorV2Mock vrfMockCoordinator = new VRFCoordinatorV2Mock(
+            BASEFEE,
+            GASPRICELINK
+        );
         uint64 subscriptionID = vrfMockCoordinator.createSubscription();
-        VRFConsumerMod vrfConsumer =
-            new VRFConsumerMod(subscriptionID, prizePool.length + 5, address(vrfMockCoordinator));
+        VRFConsumerMod vrfConsumer = new VRFConsumerMod(
+            subscriptionID,
+            prizePool.length + 5,
+            address(vrfMockCoordinator)
+        );
         vrfMockCoordinator.fundSubscription(subscriptionID, 10000000 ether);
         vrfMockCoordinator.addConsumer(subscriptionID, address(vrfConsumer));
 
@@ -120,7 +147,10 @@ abstract contract BaseGameTest is Test, GameUtils {
         Controller controller = new Controller();
 
         // Set up Game
-        Game game = new Game(address(networkDetails.routerAddress), address(networkDetails.linkAddress));
+        Game game = new Game(
+            address(networkDetails.routerAddress),
+            address(networkDetails.linkAddress)
+        );
 
         // Set up GameAttestation
         GameAttestation gameAttestation = new GameAttestation();
@@ -133,16 +163,29 @@ abstract contract BaseGameTest is Test, GameUtils {
         NFT nft = new NFT("PlayNFT", "PNFT");
 
         // Set up Sablier
-        SablierV2Comptroller sablierV2Comptroller = new SablierV2Comptroller(owner);
+        SablierV2Comptroller sablierV2Comptroller = new SablierV2Comptroller(
+            owner
+        );
         SablierV2NFTDescriptor sablierV2NFTDescriptor = new SablierV2NFTDescriptor();
         {
-            SablierV2LockupLinear lockupLinear =
-                new SablierV2LockupLinear(owner, sablierV2Comptroller, sablierV2NFTDescriptor);
-            StreamCreator streamCreator = new StreamCreator(lockupLinear, address(token));
+            SablierV2LockupLinear lockupLinear = new SablierV2LockupLinear(
+                owner,
+                sablierV2Comptroller,
+                sablierV2NFTDescriptor
+            );
+            StreamCreator streamCreator = new StreamCreator(
+                lockupLinear,
+                address(token)
+            );
 
             // Initialize game
             game.initialise(
-                token, gameAttestation, nft, streamCreator, address(vrfConsumer), networkDetails.chainSelector
+                token,
+                gameAttestation,
+                nft,
+                streamCreator,
+                address(vrfConsumer),
+                networkDetails.chainSelector
             );
 
             // Set controllers
@@ -157,7 +200,10 @@ abstract contract BaseGameTest is Test, GameUtils {
             controller.grantRole(controller.OWNER_ROLE(), address(game));
             controller.grantRole(controller.OWNER_ROLE(), address(nft));
             controller.grantRole(controller.OWNER_ROLE(), address(token));
-            controller.grantRole(controller.OWNER_ROLE(), address(streamCreator));
+            controller.grantRole(
+                controller.OWNER_ROLE(),
+                address(streamCreator)
+            );
 
             // Set up GameAttestation
             gameAttestation.setSPInstance(address(signProtocol));
@@ -168,7 +214,11 @@ abstract contract BaseGameTest is Test, GameUtils {
                     registrant: address(gameAttestation),
                     maxValidFor: 7 days,
                     timestamp: uint64(block.timestamp),
-                    data: "{" '"name":"No name Game Play Token",' '"description":"Schema for Play token",' '"data":[]' "}",
+                    data: "{"
+                    '"name":"No name Game Play Token",'
+                    '"description":"Schema for Play token",'
+                    '"data":[]'
+                    "}",
                     dataLocation: DataLocation.ONCHAIN
                 })
             );
@@ -180,7 +230,12 @@ abstract contract BaseGameTest is Test, GameUtils {
             _faucetMint(address(token), owner, spha, 1000000000000 ether);
             _faucetMint(address(token), owner, mike, 1000000000000 ether);
             _faucetMint(address(token), owner, owner, 1000000000000 ether);
-            _faucetMint(address(token), owner, address(game), 10000000000000000 ether);
+            _faucetMint(
+                address(token),
+                owner,
+                address(game),
+                10000000000000000 ether
+            );
 
             // Approve tokens for game
             token.approve(address(game), type(uint256).max);
@@ -231,31 +286,45 @@ abstract contract BaseGameTest is Test, GameUtils {
         }
     }
 
-    function createUsers(string memory chainLabel)
-        internal
-        returns (address, address, address, uint256, uint256, uint256)
-    {
-        (address spha, uint256 sphaPK) = _createUser(string(abi.encodePacked("sphaCHAIN", chainLabel)));
-        (address mike, uint256 mikePK) = _createUser(string(abi.encodePacked("mikeCHAIN", chainLabel)));
-        (address owner, uint256 ownerPK) = _createUser(string(abi.encodePacked("ownerCHAIN", chainLabel)));
+    function createUsers(
+        string memory chainLabel
+    ) internal returns (address, address, address, uint256, uint256, uint256) {
+        (address spha, uint256 sphaPK) = _createUser(
+            string(abi.encodePacked("sphaCHAIN", chainLabel))
+        );
+        (address mike, uint256 mikePK) = _createUser(
+            string(abi.encodePacked("mikeCHAIN", chainLabel))
+        );
+        (address owner, uint256 ownerPK) = _createUser(
+            string(abi.encodePacked("ownerCHAIN", chainLabel))
+        );
         return (spha, mike, owner, sphaPK, mikePK, ownerPK);
     }
 
-    function fundGameWithLink(uint256 chainForkID, address gameAddress, address owner) internal {
+    function fundGameWithLink(
+        uint256 chainForkID,
+        address gameAddress,
+        address owner
+    ) internal {
         vm.selectFork(chainForkID);
         vm.startPrank(owner);
         ccipLocalSimulatorFork.requestLinkFromFaucet(gameAddress, 5 ether);
         vm.stopPrank();
     }
 
-    function _createUser(string memory name) internal returns (address payable, uint256) {
+    function _createUser(
+        string memory name
+    ) internal returns (address payable, uint256) {
         (address user, uint256 privateKey) = makeAddrAndKey(name);
         vm.deal({account: user, newBalance: 1000 ether});
         vm.label(user, name);
         return (payable(user), privateKey);
     }
 
-    function _createUserWithTokenBalance(string memory name, Token token) internal returns (address payable, uint256) {
+    function _createUserWithTokenBalance(
+        string memory name,
+        Token token
+    ) internal returns (address payable, uint256) {
         (address user, uint256 privateKey) = _createUser(name);
         vm.startPrank(user);
         token.mint(user, 10000 ether);
@@ -264,13 +333,23 @@ abstract contract BaseGameTest is Test, GameUtils {
         return (payable(user), privateKey);
     }
 
-    function _faucetMint(address tokenAddress, address admin, address to, uint256 amount) internal {
+    function _faucetMint(
+        address tokenAddress,
+        address admin,
+        address to,
+        uint256 amount
+    ) internal {
         vm.startPrank(admin);
         Token(tokenAddress).mint(to, amount);
         vm.stopPrank();
     }
 
-    function _faucetToken(address tokenAddress, address whale, address to, uint256 amount) internal {
+    function _faucetToken(
+        address tokenAddress,
+        address whale,
+        address to,
+        uint256 amount
+    ) internal {
         vm.startPrank(whale);
         assert(Token(tokenAddress).balanceOf(whale) > 0);
         Token(tokenAddress).transfer(to, amount);
@@ -282,10 +361,14 @@ abstract contract BaseGameTest is Test, GameUtils {
             prizePool.push(PoolPrize({prizeType: Prize.NFT, amount: 1}));
         }
         for (uint256 i = 0; i < 4; i++) {
-            prizePool.push(PoolPrize({prizeType: Prize.Token, amount: 5 ether}));
+            prizePool.push(
+                PoolPrize({prizeType: Prize.Token, amount: 5 ether})
+            );
         }
         for (uint256 i = 0; i < 4; i++) {
-            prizePool.push(PoolPrize({prizeType: Prize.Sablier, amount: 10 ether}));
+            prizePool.push(
+                PoolPrize({prizeType: Prize.Sablier, amount: 10 ether})
+            );
         }
     }
 }

@@ -19,4 +19,15 @@ contract Controller is AccessControl {
         _setRoleAdmin(OWNER_ROLE, OWNER_ROLE);
         _grantRole(OWNER_ROLE, msg.sender);
     }
+
+    function renounceRole(
+        bytes32 role,
+        address callerConfirmation
+    ) public virtual override {
+        require(
+            hasRole(OWNER_ROLE, msg.sender),
+            "AccessControl: only owner can renounce roles"
+        );
+        super.renounceRole(role, callerConfirmation);
+    }
 }

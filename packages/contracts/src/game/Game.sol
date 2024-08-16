@@ -71,7 +71,7 @@ contract Game is
     StreamCreator public streamCreator;
     Controller public controller;
     GameAttestation public playTokenAttestor;
-    uint256 public playCost;
+    uint256 public playCostOneDay;
     address public router;
     address public link;
     uint64 public chainSelector;
@@ -132,7 +132,7 @@ contract Game is
             revert UsedSignature();
         }
         bytes32 messageHash = keccak256(
-            abi.encodePacked(userScores, msg.sender, block.chainid)
+            abi.encodePacked(userScores, addressScores, block.chainid)
         );
         bytes32 message = MessageHashUtils.toEthSignedMessageHash(messageHash);
         address recoveredAddress = ECDSA.recover(message, signature);
@@ -238,7 +238,7 @@ contract Game is
             success = playToken.transferFrom(
                 msg.sender,
                 address(this),
-                playCost
+                playCostOneDay * 86400
             );
             if (!success) {
                 revert InsufficientBalance();
@@ -246,16 +246,19 @@ contract Game is
         }
 
         if (pay && success) {
-            tokenId = _createPlayToken(3600, msg.sender);
+            tokenId = _createPlayToken(86400, msg.sender);
             player.player = msg.sender;
             player.token = tokenId;
         }
-        emit PaidPlay(msg.sender, playCost, tokenId);
+        emit PaidPlay(msg.sender, playCostOneDay * 86400, tokenId);
     }
     /// @inheritdoc IGame
     function play(
         uint64 periodInDays
     ) public override canPlayGame notBlackListed returns (bool ok) {
+        if (periodInDays < 86400) {
+            revert InvalidPeriod();
+        }
         Player storage player = playTokens[msg.sender];
         Attestation memory attestation = playTokenAttestor
             .spInstance()
@@ -274,7 +277,7 @@ contract Game is
             success = playToken.transferFrom(
                 msg.sender,
                 address(this),
-                playCost
+                playCostOneDay * periodInDays
             );
             if (!success) {
                 revert InsufficientBalance();
@@ -286,7 +289,7 @@ contract Game is
             player.player = msg.sender;
             player.token = tokenId;
         }
-        emit PaidPlay(msg.sender, playCost, tokenId);
+        emit PaidPlay(msg.sender, playCostOneDay * periodInDays, tokenId);
     }
 
     /// @inheritdoc IGame
@@ -298,11 +301,11 @@ contract Game is
         notBlackListed
     {
         Player storage player = playTokens[msg.sender];
-        uint64 tokenId = _createPlayToken(1800, msg.sender);
+        uint64 tokenId = _createPlayToken(86400, msg.sender);
         player.player = msg.sender;
         player.token = tokenId;
         freePlays[msg.sender] = true;
-        emit FreePlay(msg.sender, playCost, tokenId);
+        emit FreePlay(msg.sender, playCostOneDay * 86400, tokenId);
     }
 
     /// @inheritdoc IGame
@@ -409,8 +412,8 @@ contract Game is
         if (cost == 0) {
             revert CostCannotBeZero();
         }
-        emit PlayCostUpdate(playCost, cost);
-        playCost = cost;
+        emit PlayCostUpdate(playCostOneDay, cost);
+        playCostOneDay = cost;
     }
 
     /// @return tokenId The ID of the created play token
@@ -423,7 +426,7 @@ contract Game is
             IGameAttestation.GamePlayAttestation({
                 user: player,
                 game: address(this),
-                cost: playCost,
+                cost: playCostOneDay,
                 recipients: recipients,
                 validUntil: validUntil
             })
@@ -459,7 +462,7 @@ contract Game is
                 abi.decode(any2EvmMessage.sender, (address)),
                 message
             );
-            crossChainPlay(message, chainSelector);
+            crossChainPlay(message, any2EvmMessage.sourceChainSelector);
             return;
         }
 
@@ -468,9 +471,13 @@ contract Game is
         }
         player = playTokens[message.playerChainB];
         player.player = message.playerChainB;
-        uint64 tokenId = _createPlayToken(message.validUntil, player.player);
+        uint64 vaildUntil = 0;
+        //@dev very important we only issue a new token based on the remaining duration
+        if (message.validUntil > block.timestamp) {
+            vaildUntil = uint64(message.validUntil - block.timestamp);
+        }
+        uint64 tokenId = _createPlayToken(vaildUntil, player.player);
         player.token = tokenId;
-
         emit MessageReceived(
             any2EvmMessage.messageId,
             any2EvmMessage.sourceChainSelector,

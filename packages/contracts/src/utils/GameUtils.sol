@@ -22,8 +22,8 @@ interface GameUtils {
     /// @param prizeType Type of the prize.
     /// @param amount Amount or value of the prize.
     struct PoolPrize {
-        Prize prizeType; 
-        uint256 amount; 
+        Prize prizeType;
+        uint256 amount;
     }
 
     /// @notice Structure representing a player in the game.
@@ -32,10 +32,10 @@ interface GameUtils {
     /// @param token Token associated with the player i.e. The Attestation ID.
     /// @param score Score of the player.
     struct Player {
-        address player; 
+        address player;
         uint16 collected;
-        uint64 token; 
-        uint64 score; 
+        uint64 token;
+        uint64 score;
     }
 
     /// @notice Structure representing a message sent between chains.
@@ -46,11 +46,11 @@ interface GameUtils {
     /// @param validToken Token associated with the message.
     /// @param validUntil Expiry time of the token.
     struct GameMessage {
-        address player; 
-        address playerChainB; 
-        address receiver; 
+        address player;
+        address playerChainB;
+        address receiver;
         MessageType messageType;
-        bool validToken; 
+        bool validToken;
         uint64 validUntil;
     }
 
@@ -168,4 +168,6 @@ interface GameUtils {
 
     /// @notice Error indicating that a signature has been used already
     error UsedSignature();
+    /// @notice Error indicating that the period is invalid we only ever allow a period of 365 days at a time
+    error InvalidPeriod();
 }
